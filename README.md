@@ -93,14 +93,14 @@ Starts a local proxy to the remote server
 Usage: bore local [OPTIONS] --to <TO> <LOCAL_PORT>
 
 Arguments:
-  <LOCAL_PORT>  The local port to expose
+  <LOCAL_PORT>  The local port to expose [env: BORE_LOCAL_PORT=]
 
 Options:
   -l, --local-host <HOST>  The local host to expose [default: localhost]
   -t, --to <TO>            Address of the remote server to expose local ports to [env: BORE_SERVER=]
   -p, --port <PORT>        Optional port on the remote server to select [default: 0]
   -s, --secret <SECRET>    Optional secret for authentication [env: BORE_SECRET]
-  -h, --help               Print help information
+  -h, --help               Print help
 ```
 
 ### Self-Hosting
@@ -126,10 +126,9 @@ Options:
       --min-port <MIN_PORT>          Minimum accepted TCP port number [env: BORE_MIN_PORT=] [default: 1024]
       --max-port <MAX_PORT>          Maximum accepted TCP port number [env: BORE_MAX_PORT=] [default: 65535]
   -s, --secret <SECRET>              Optional secret for authentication [env: BORE_SECRET]
-      --control-addr <CONTROL_ADDR>  IP address for the control server. Bore clients must reach this address [default: 0.0.0.0]
-      --tunnels-addr <TUNNELS_ADDR>  IP address where tunnels will listen on [default: 0.0.0.0]
+      --bind-addr <BIND_ADDR>        IP address to bind to, clients must reach this [default: 0.0.0.0]
+      --bind-tunnels <BIND_TUNNELS>  IP address where tunnels will listen on, defaults to --bind-addr
   -h, --help                         Print help
-
 ```
 
 ## Protocol

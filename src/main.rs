@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+
 use anyhow::Result;
 use bore_cli::{client::Client, server::Server};
 use clap::{error::ErrorKind, CommandFactory, Parser, Subcommand};
@@ -49,13 +50,13 @@ enum Command {
         #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
         secret: Option<String>,
 
-        /// IP address to bind to. Bore clients must reach this.
+        /// IP address to bind to, clients must reach this.
         #[clap(long, default_value = "0.0.0.0")]
-        bind_addr: String,
+        bind_addr: IpAddr,
 
-        /// IP address where tunnels will listen on. Defaults to --bind-addr.
+        /// IP address where tunnels will listen on, defaults to --bind-addr.
         #[clap(long)]
-        bind_tunnels: Option<String>,
+        bind_tunnels: Option<IpAddr>,
     },
 }
 
@@ -85,24 +86,10 @@ async fn run(command: Command) -> Result<()> {
                     .error(ErrorKind::InvalidValue, "port range is empty")
                     .exit();
             }
-
-            let ipaddr_control = bind_addr.parse::<IpAddr>();
-            if ipaddr_control.is_err() {
-                Args::command()
-                    .error(ErrorKind::InvalidValue, "invalid ip address for control server")
-                    .exit();
-            }
-
-            let ipaddr_tunnels = bind_tunnels.unwrap_or(bind_addr).parse::<IpAddr>();
-            if ipaddr_tunnels.is_err() {
-                Args::command()
-                    .error(ErrorKind::InvalidValue, "invalid ip address for tunnel connections")
-                    .exit();
-            }
-
-            Server::new(port_range, secret.as_deref(), ipaddr_control.unwrap(), ipaddr_tunnels.unwrap())
-                .listen()
-                .await?;
+            let mut server = Server::new(port_range, secret.as_deref());
+            server.set_bind_addr(bind_addr);
+            server.set_bind_tunnels(bind_tunnels.unwrap_or(bind_addr));
+            server.listen().await?;
         }
     }
 

@@ -1,7 +1,7 @@
 //! Server implementation for the `bore` service.
 
+use std::net::{IpAddr, Ipv4Addr};
 use std::{io, ops::RangeInclusive, sync::Arc, time::Duration};
-use std::net::IpAddr;
 
 use anyhow::Result;
 use dashmap::DashMap;
@@ -25,7 +25,7 @@ pub struct Server {
     /// Concurrent map of IDs to incoming connections.
     conns: Arc<DashMap<Uuid, TcpStream>>,
 
-    /// IP address where the control server will bind to. Bore clients must reach this.
+    /// IP address where the control server will bind to.
     bind_addr: IpAddr,
 
     /// IP address where tunnels will listen on.
@@ -34,27 +34,32 @@ pub struct Server {
 
 impl Server {
     /// Create a new server with a specified minimum port number.
-    pub fn new(
-        port_range: RangeInclusive<u16>,
-        secret: Option<&str>,
-        bind_addr: IpAddr,
-        bind_tunnels: IpAddr,
-    ) -> Self {
+    pub fn new(port_range: RangeInclusive<u16>, secret: Option<&str>) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
         Server {
             port_range,
             conns: Arc::new(DashMap::new()),
             auth: secret.map(Authenticator::new),
-            bind_addr,
-            bind_tunnels,
+            bind_addr: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            bind_tunnels: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
         }
+    }
+
+    /// Set the IP address where tunnels will listen on.
+    pub fn set_bind_addr(&mut self, bind_addr: IpAddr) {
+        self.bind_addr = bind_addr;
+    }
+
+    /// Set the IP address where the control server will bind to.
+    pub fn set_bind_tunnels(&mut self, bind_tunnels: IpAddr) {
+        self.bind_tunnels = bind_tunnels;
     }
 
     /// Start the server, listening for new connections.
     pub async fn listen(self) -> Result<()> {
         let this = Arc::new(self);
         let listener = TcpListener::bind((this.bind_addr, CONTROL_PORT)).await?;
-        info!(addr = ?this.bind_addr, port = CONTROL_PORT, "server listening");
+        info!(addr = ?this.bind_addr, "server listening");
 
         loop {
             let (stream, addr) = listener.accept().await?;
