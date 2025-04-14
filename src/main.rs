@@ -49,13 +49,13 @@ enum Command {
         #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
         secret: Option<String>,
 
-        /// IP address where the control server will bind to. Bore clients must reach this.
+        /// IP address to bind to. Bore clients must reach this.
         #[clap(long, default_value = "0.0.0.0")]
         bind_addr: String,
 
-        /// IP address where tunnels will listen on.
-        #[clap(long, default_value = "0.0.0.0")]
-        bind_tunnels: String,
+        /// IP address where tunnels will listen on. Defaults to --bind-addr.
+        #[clap(long)]
+        bind_tunnels: Option<String>,
     },
 }
 
@@ -93,7 +93,7 @@ async fn run(command: Command) -> Result<()> {
                     .exit();
             }
 
-            let ipaddr_tunnels = bind_tunnels.parse::<IpAddr>();
+            let ipaddr_tunnels = bind_tunnels.unwrap_or(bind_addr).parse::<IpAddr>();
             if ipaddr_tunnels.is_err() {
                 Args::command()
                     .error(ErrorKind::InvalidValue, "invalid ip address for tunnel connections")

@@ -54,7 +54,7 @@ impl Server {
     pub async fn listen(self) -> Result<()> {
         let this = Arc::new(self);
         let listener = TcpListener::bind((this.bind_addr, CONTROL_PORT)).await?;
-        info!(addr = ?this.bind_addr, "server listening");
+        info!(addr = ?this.bind_addr, port = CONTROL_PORT, "server listening");
 
         loop {
             let (stream, addr) = listener.accept().await?;
@@ -133,8 +133,9 @@ impl Server {
                         return Ok(());
                     }
                 };
+                let host = listener.local_addr()?.ip();
                 let port = listener.local_addr()?.port();
-                info!(?port, "new client");
+                info!(?host, ?port, "new client");
                 stream.send(ServerMessage::Hello(port)).await?;
 
                 loop {
