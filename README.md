@@ -85,6 +85,8 @@ bore server
 
 That's all it takes! After the server starts running at a given address, you can then update the `bore local` command with option `--to <ADDRESS>` to forward a local port to this remote server.
 
+It's possible to specify different IP addresses for the control server and for the tunnels. This setup is useful for cases where you might want the control server to be on a private network while allowing tunnel connections over a public interface, or vice versa.
+
 The full options for the `bore server` command are shown below.
 
 ```shell
@@ -93,10 +95,13 @@ Runs the remote proxy server
 Usage: bore server [OPTIONS]
 
 Options:
-      --min-port <MIN_PORT>  Minimum accepted TCP port number [default: 1024, env: BORE_MIN_PORT]
-      --max-port <MAX_PORT>  Maximum accepted TCP port number [default: 65535, env: BORE_MAX_PORT]
-  -s, --secret <SECRET>      Optional secret for authentication [env: BORE_SECRET]
-  -h, --help                 Print help information
+      --min-port <MIN_PORT>          Minimum accepted TCP port number [env: BORE_MIN_PORT=] [default: 1024]
+      --max-port <MAX_PORT>          Maximum accepted TCP port number [env: BORE_MAX_PORT=] [default: 65535]
+  -s, --secret <SECRET>              Optional secret for authentication [env: BORE_SECRET]
+      --control-addr <CONTROL_ADDR>  IP address for the control server. Bore clients must reach this address [default: 0.0.0.0]
+      --tunnels-addr <TUNNELS_ADDR>  IP address where tunnels will listen on [default: 0.0.0.0]
+  -h, --help                         Print help
+
 ```
 
 ## Protocol
