@@ -19,7 +19,15 @@ lazy_static! {
 
 /// Spawn the server, giving some time for the control port TcpListener to start.
 async fn spawn_server(secret: Option<&str>) {
-    tokio::spawn(Server::new(1024..=65535, secret).listen());
+    tokio::spawn(
+        Server::new(
+            1024..=65535,
+            secret,
+            "0.0.0.0".to_string(),
+            "0.0.0.0".to_string(),
+        )
+        .listen(),
+    );
     time::sleep(Duration::from_millis(50)).await;
 }
 
@@ -125,5 +133,10 @@ async fn very_long_frame() -> Result<()> {
 fn empty_port_range() {
     let min_port = 5000;
     let max_port = 3000;
-    let _ = Server::new(min_port..=max_port, None);
+    let _ = Server::new(
+        min_port..=max_port,
+        None,
+        "0.0.0.0".to_string(),
+        "0.0.0.0".to_string(),
+    );
 }
