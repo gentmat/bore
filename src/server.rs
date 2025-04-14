@@ -1,6 +1,7 @@
 //! Server implementation for the `bore` service.
 
 use std::{io, ops::RangeInclusive, sync::Arc, time::Duration};
+use std::net::IpAddr;
 
 use anyhow::Result;
 use dashmap::DashMap;
@@ -25,15 +26,20 @@ pub struct Server {
     conns: Arc<DashMap<Uuid, TcpStream>>,
 
     /// IP address for the control server. Bore clients must reach this address.
-    control_addr: String,
+    control_addr: IpAddr,
 
     /// IP address where tunnels will listen on.
-    tunnels_addr: String,
+    tunnels_addr: IpAddr,
 }
 
 impl Server {
     /// Create a new server with a specified minimum port number.
-    pub fn new(port_range: RangeInclusive<u16>, secret: Option<&str>, control_addr: String, tunnels_addr: String) -> Self {
+    pub fn new(
+        port_range: RangeInclusive<u16>,
+        secret: Option<&str>,
+        control_addr: IpAddr,
+        tunnels_addr: IpAddr,
+    ) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
         Server {
             port_range,
@@ -47,7 +53,7 @@ impl Server {
     /// Start the server, listening for new connections.
     pub async fn listen(self) -> Result<()> {
         let this = Arc::new(self);
-        let listener = TcpListener::bind((this.control_addr.as_ref(), CONTROL_PORT)).await?;
+        let listener = TcpListener::bind((this.control_addr, CONTROL_PORT)).await?;
         info!(?this.control_addr, "server listening");
 
         loop {
@@ -69,7 +75,7 @@ impl Server {
 
     async fn create_listener(&self, port: u16) -> Result<TcpListener, &'static str> {
         let try_bind = |port: u16| async move {
-            TcpListener::bind((self.tunnels_addr.as_ref(), port))
+            TcpListener::bind((self.tunnels_addr, port))
                 .await
                 .map_err(|err| match err.kind() {
                     io::ErrorKind::AddrInUse => "port already in use",

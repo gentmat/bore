@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use anyhow::Result;
 use bore_cli::{client::Client, server::Server};
 use clap::{error::ErrorKind, CommandFactory, Parser, Subcommand};
@@ -84,7 +85,24 @@ async fn run(command: Command) -> Result<()> {
                     .error(ErrorKind::InvalidValue, "port range is empty")
                     .exit();
             }
-            Server::new(port_range, secret.as_deref(), control_addr, tunnels_addr).listen().await?;
+
+            let ipaddr_control = control_addr.parse::<IpAddr>();
+            if ipaddr_control.is_err() {
+                Args::command()
+                    .error(ErrorKind::InvalidValue, "invalid ip address for control server")
+                    .exit();
+            }
+
+            let ipaddr_tunnels = tunnels_addr.parse::<IpAddr>();
+            if ipaddr_tunnels.is_err() {
+                Args::command()
+                    .error(ErrorKind::InvalidValue, "invalid ip address for tunnel connections")
+                    .exit();
+            }
+
+            Server::new(port_range, secret.as_deref(), ipaddr_control.unwrap(), ipaddr_tunnels.unwrap())
+                .listen()
+                .await?;
         }
     }
 

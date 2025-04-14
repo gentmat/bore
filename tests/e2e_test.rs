@@ -1,6 +1,7 @@
 #![allow(clippy::items_after_test_module)]
 
 use std::net::SocketAddr;
+use std::net::IpAddr;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
@@ -23,8 +24,8 @@ async fn spawn_server(secret: Option<&str>) {
         Server::new(
             1024..=65535,
             secret,
-            "0.0.0.0".to_string(),
-            "0.0.0.0".to_string(),
+            "0.0.0.0".parse::<IpAddr>().unwrap(),
+            "0.0.0.0".parse::<IpAddr>().unwrap(),
         )
         .listen(),
     );
@@ -136,7 +137,7 @@ fn empty_port_range() {
     let _ = Server::new(
         min_port..=max_port,
         None,
-        "0.0.0.0".to_string(),
-        "0.0.0.0".to_string(),
+        "0.0.0.0".parse::<IpAddr>().unwrap(),
+        "0.0.0.0".parse::<IpAddr>().unwrap(),
     );
 }
