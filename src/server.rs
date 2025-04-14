@@ -26,17 +26,21 @@ pub struct Server {
 
     /// IP address for the control server. Bore clients must reach this address.
     control_addr: String,
+
+    /// IP address where tunnels will listen on.
+    tunnels_addr: String,
 }
 
 impl Server {
     /// Create a new server with a specified minimum port number.
-    pub fn new(port_range: RangeInclusive<u16>, secret: Option<&str>, control_addr: String) -> Self {
+    pub fn new(port_range: RangeInclusive<u16>, secret: Option<&str>, control_addr: String, tunnels_addr: String) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
         Server {
             port_range,
             conns: Arc::new(DashMap::new()),
             auth: secret.map(Authenticator::new),
-            control_addr: control_addr,
+            control_addr,
+            tunnels_addr,
         }
     }
 
@@ -65,7 +69,7 @@ impl Server {
 
     async fn create_listener(&self, port: u16) -> Result<TcpListener, &'static str> {
         let try_bind = |port: u16| async move {
-            TcpListener::bind(("0.0.0.0", port))
+            TcpListener::bind((self.tunnels_addr.as_ref(), port))
                 .await
                 .map_err(|err| match err.kind() {
                     io::ErrorKind::AddrInUse => "port already in use",

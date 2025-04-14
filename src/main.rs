@@ -51,6 +51,10 @@ enum Command {
         /// IP address for the control server. Bore clients must reach this address.
         #[clap(long, default_value = "0.0.0.0")]
         control_addr: String,
+
+        /// IP address where tunnels will listen on.
+        #[clap(long, default_value = "0.0.0.0")]
+        tunnels_addr: String,
     },
 }
 
@@ -72,6 +76,7 @@ async fn run(command: Command) -> Result<()> {
             max_port,
             secret,
             control_addr,
+            tunnels_addr,
         } => {
             let port_range = min_port..=max_port;
             if port_range.is_empty() {
@@ -79,7 +84,7 @@ async fn run(command: Command) -> Result<()> {
                     .error(ErrorKind::InvalidValue, "port range is empty")
                     .exit();
             }
-            Server::new(port_range, secret.as_deref(), control_addr).listen().await?;
+            Server::new(port_range, secret.as_deref(), control_addr, tunnels_addr).listen().await?;
         }
     }
 
