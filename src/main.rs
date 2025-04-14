@@ -49,13 +49,13 @@ enum Command {
         #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
         secret: Option<String>,
 
-        /// IP address for the control server. Bore clients must reach this address.
+        /// IP address where the control server will bind to. Bore clients must reach this.
         #[clap(long, default_value = "0.0.0.0")]
-        control_addr: String,
+        bind_addr: String,
 
         /// IP address where tunnels will listen on.
         #[clap(long, default_value = "0.0.0.0")]
-        tunnels_addr: String,
+        bind_tunnels: String,
     },
 }
 
@@ -76,8 +76,8 @@ async fn run(command: Command) -> Result<()> {
             min_port,
             max_port,
             secret,
-            control_addr,
-            tunnels_addr,
+            bind_addr,
+            bind_tunnels,
         } => {
             let port_range = min_port..=max_port;
             if port_range.is_empty() {
@@ -86,14 +86,14 @@ async fn run(command: Command) -> Result<()> {
                     .exit();
             }
 
-            let ipaddr_control = control_addr.parse::<IpAddr>();
+            let ipaddr_control = bind_addr.parse::<IpAddr>();
             if ipaddr_control.is_err() {
                 Args::command()
                     .error(ErrorKind::InvalidValue, "invalid ip address for control server")
                     .exit();
             }
 
-            let ipaddr_tunnels = tunnels_addr.parse::<IpAddr>();
+            let ipaddr_tunnels = bind_tunnels.parse::<IpAddr>();
             if ipaddr_tunnels.is_err() {
                 Args::command()
                     .error(ErrorKind::InvalidValue, "invalid ip address for tunnel connections")

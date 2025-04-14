@@ -25,11 +25,11 @@ pub struct Server {
     /// Concurrent map of IDs to incoming connections.
     conns: Arc<DashMap<Uuid, TcpStream>>,
 
-    /// IP address for the control server. Bore clients must reach this address.
-    control_addr: IpAddr,
+    /// IP address where the control server will bind to. Bore clients must reach this.
+    bind_addr: IpAddr,
 
     /// IP address where tunnels will listen on.
-    tunnels_addr: IpAddr,
+    bind_tunnels: IpAddr,
 }
 
 impl Server {
@@ -37,24 +37,24 @@ impl Server {
     pub fn new(
         port_range: RangeInclusive<u16>,
         secret: Option<&str>,
-        control_addr: IpAddr,
-        tunnels_addr: IpAddr,
+        bind_addr: IpAddr,
+        bind_tunnels: IpAddr,
     ) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
         Server {
             port_range,
             conns: Arc::new(DashMap::new()),
             auth: secret.map(Authenticator::new),
-            control_addr,
-            tunnels_addr,
+            bind_addr,
+            bind_tunnels,
         }
     }
 
     /// Start the server, listening for new connections.
     pub async fn listen(self) -> Result<()> {
         let this = Arc::new(self);
-        let listener = TcpListener::bind((this.control_addr, CONTROL_PORT)).await?;
-        info!(?this.control_addr, "server listening");
+        let listener = TcpListener::bind((this.bind_addr, CONTROL_PORT)).await?;
+        info!(addr = ?this.bind_addr, "server listening");
 
         loop {
             let (stream, addr) = listener.accept().await?;
@@ -75,7 +75,7 @@ impl Server {
 
     async fn create_listener(&self, port: u16) -> Result<TcpListener, &'static str> {
         let try_bind = |port: u16| async move {
-            TcpListener::bind((self.tunnels_addr, port))
+            TcpListener::bind((self.bind_tunnels, port))
                 .await
                 .map_err(|err| match err.kind() {
                     io::ErrorKind::AddrInUse => "port already in use",
