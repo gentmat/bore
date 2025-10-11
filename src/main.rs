@@ -46,9 +46,17 @@ enum Command {
         #[clap(long, default_value_t = 65535, env = "BORE_MAX_PORT")]
         max_port: u16,
 
-        /// Optional secret for authentication.
+        /// Optional secret for authentication (deprecated, use backend API instead).
         #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
         secret: Option<String>,
+
+        /// Backend API URL for user authentication and usage tracking.
+        #[clap(long, env = "BORE_BACKEND_URL")]
+        backend_url: Option<String>,
+
+        /// Server ID for multi-server deployments (used in usage tracking).
+        #[clap(long, env = "BORE_SERVER_ID", default_value = "default")]
+        server_id: String,
 
         /// IP address to bind to, clients must reach this.
         #[clap(long, default_value = "0.0.0.0")]
@@ -77,6 +85,8 @@ async fn run(command: Command) -> Result<()> {
             min_port,
             max_port,
             secret,
+            backend_url,
+            server_id,
             bind_addr,
             bind_tunnels,
         } => {
@@ -86,7 +96,12 @@ async fn run(command: Command) -> Result<()> {
                     .error(ErrorKind::InvalidValue, "port range is empty")
                     .exit();
             }
-            let mut server = Server::new(port_range, secret.as_deref());
+            let mut server = Server::new(
+                port_range,
+                secret.as_deref(),
+                backend_url,
+                server_id,
+            );
             server.set_bind_addr(bind_addr);
             server.set_bind_tunnels(bind_tunnels.unwrap_or(bind_addr));
             server.listen().await?;

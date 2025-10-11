@@ -1,0 +1,29 @@
+[package]
+name = "bore-server"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+description = "Server component for bore - TCP tunnel server that accepts connections"
+documentation = "https://docs.rs/bore-server"
+keywords = ["network", "server", "tunnel", "tcp"]
+categories = ["network-programming", "web-programming", "command-line-utilities"]
+
+[[bin]]
+name = "bore-server"
+path = "src/main.rs"
+
+[dependencies]
+bore-shared = { path = "../bore-shared" }
+anyhow.workspace = true
+clap.workspace = true
+dashmap.workspace = true
+fastrand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true

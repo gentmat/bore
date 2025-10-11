@@ -1,0 +1,23 @@
+[package]
+name = "bore-shared"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+description = "Shared library for bore tunnel - protocol definitions and utilities"
+keywords = ["network", "tunnel", "tcp"]
+categories = ["network-programming"]
+
+[dependencies]
+anyhow.workspace = true
+futures-util.workspace = true
+hex.workspace = true
+hmac.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true

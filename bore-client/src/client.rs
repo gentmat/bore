@@ -7,8 +7,9 @@ use tokio::{io::AsyncWriteExt, net::TcpStream, time::timeout};
 use tracing::{error, info, info_span, warn, Instrument};
 use uuid::Uuid;
 
-use crate::auth::Authenticator;
-use crate::shared::{ClientMessage, Delimited, ServerMessage, CONTROL_PORT, NETWORK_TIMEOUT};
+use bore_shared::{
+    Authenticator, ClientMessage, Delimited, ServerMessage, CONTROL_PORT, NETWORK_TIMEOUT,
+};
 
 /// State structure for the client.
 pub struct Client {
@@ -25,6 +26,7 @@ pub struct Client {
     local_port: u16,
 
     /// Port that is publicly available on the remote.
+    #[allow(dead_code)]
     remote_port: u16,
 
     /// Optional API key for backend authentication.
@@ -64,7 +66,7 @@ impl Client {
         } else {
             // Legacy mode: Use HMAC challenge-response
             let auth = secret.map(Authenticator::new);
-            if let Some(auth) = &auth {
+            if auth.is_some() {
                 warn!("Using legacy HMAC authentication (deprecated)");
                 // Note: In legacy mode, we don't send Authenticate here.
                 // The client sends Hello first, and the server may send Challenge.
@@ -104,6 +106,7 @@ impl Client {
     }
 
     /// Returns the port publicly available on the remote.
+    #[allow(dead_code)]
     pub fn remote_port(&self) -> u16 {
         self.remote_port
     }
@@ -141,7 +144,7 @@ impl Client {
             Delimited::new(connect_with_timeout(&self.to[..], CONTROL_PORT).await?);
         
         // Authenticate if using API key or legacy auth
-        if let Some(api_key) = &self.api_key {
+        if self.api_key.is_some() {
             // New mode: Send API key (but server won't check it again for Accept messages)
             // We just send Accept directly
         } else if let Some(auth) = &self.auth {

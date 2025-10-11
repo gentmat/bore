@@ -11,9 +11,9 @@ use tokio::time::{sleep, timeout};
 use tracing::{info, info_span, warn, Instrument};
 use uuid::Uuid;
 
-use crate::auth::Authenticator;
+use bore_shared::{Authenticator, ClientMessage, Delimited, ServerMessage, CONTROL_PORT};
+
 use crate::backend::BackendClient;
-use crate::shared::{ClientMessage, Delimited, ServerMessage, CONTROL_PORT};
 
 /// State structure for the server.
 pub struct Server {
@@ -293,7 +293,7 @@ impl Server {
             }
         };
         
-        let host = listener.local_addr()?.ip();
+        let _host = listener.local_addr()?.ip();
         let public_port = listener.local_addr()?.port();
         
         info!(
