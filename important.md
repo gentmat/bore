@@ -22,6 +22,8 @@ cd /home/maroun/Documents/bore/backend
 node server.js
 
 
+Then start code-server
+
 ---------------------------------------------------------------
 Client
 bore 8080 --to 127.0.0.1 --secret temp_token_ves7j
