@@ -90,9 +90,14 @@ impl Client {
         
         info!(remote_port, "connected to server");
         info!("listening at {to}:{remote_port}");
-        println!("\n✓ Tunnel established!");
-        println!("  Public URL: {to}:{remote_port}");
-        println!("  Forwarding to: {local_host}:{local_port}\n");
+        
+        // Only show public URL in legacy mode (when not using managed instances)
+        // In managed mode, the start command handles the output
+        if !is_api_key {
+            println!("\n✓ Tunnel established!");
+            println!("  Public URL: {to}:{remote_port}");
+            println!("  Forwarding to: {local_host}:{local_port}\n");
+        }
 
         Ok(Client {
             conn: Some(stream),

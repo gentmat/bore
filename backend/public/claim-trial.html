@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bore - Claim Trial</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-card pricing-card">
+            <div class="logo">
+                <svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="25" cy="25" r="20" stroke="#6366f1" stroke-width="3" fill="none"/>
+                    <path d="M15 25 L25 15 L35 25 L25 35 Z" fill="#6366f1"/>
+                </svg>
+                <h1>Choose Your Plan</h1>
+            </div>
+            <p class="subtitle">Start tunneling securely today</p>
+            
+            <div class="pricing-options">
+                <!-- Free Trial -->
+                <div class="pricing-option" data-plan="trial">
+                    <div class="plan-badge">Most Popular</div>
+                    <h3>Free Trial</h3>
+                    <div class="price">
+                        <span class="amount">$0</span>
+                        <span class="period">/ 24 hours</span>
+                    </div>
+                    <ul class="features">
+                        <li>✓ 1 tunnel instance</li>
+                        <li>✓ 24-hour access</li>
+                        <li>✓ Basic support</li>
+                        <li>✓ No credit card required</li>
+                    </ul>
+                    <button class="btn btn-primary" onclick="claimPlan('trial')">
+                        Claim Free Trial
+                    </button>
+                </div>
+                
+                <!-- Pro Plan -->
+                <div class="pricing-option" data-plan="pro">
+                    <h3>Pro Plan</h3>
+                    <div class="price">
+                        <span class="amount">$9.99</span>
+                        <span class="period">/ month</span>
+                    </div>
+                    <ul class="features">
+                        <li>✓ Unlimited tunnels</li>
+                        <li>✓ Custom domains</li>
+                        <li>✓ Priority support</li>
+                        <li>✓ 99.9% uptime SLA</li>
+                        <li>✓ Advanced analytics</li>
+                    </ul>
+                    <button class="btn btn-secondary" onclick="claimPlan('pro')">
+                        Subscribe Now
+                    </button>
+                </div>
+            </div>
+            
+            <div id="message" class="message-box"></div>
+        </div>
+    </div>
+    
+    <script src="/js/claim-trial.js"></script>
+</body>
+</html>

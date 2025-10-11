@@ -64,23 +64,23 @@ cargo build --release -p bore-server
 
 ## Quick Start
 
-> For detailed step-by-step instructions, see `SERVER_GUIDE.md` and `CLIENT_GUIDE.md`.
+> For detailed step-by-step instructions, see `SERVER_GUIDE.md`, `CLIENT_GUIDE.md`, and `USER_GUIDE_MANAGED.md`.
 
-### 1. Run the Server
+### Two Ways to Use bore
 
-```bash
-# With backend authentication (recommended)
-bore-server \
-  --backend-url https://api.yourservice.com \
-  --server-id us-east-1 \
-  --min-port 10000 \
-  --max-port 20000
+#### Option 1: Managed Tunnels (Recommended)
 
-# Development mode (no backend, allows all clients)
-bore-server
-```
+**Best for:** Regular users, teams, production use
 
-### 2. Connect a Client
+1. Create account and instances in your web dashboard
+2. Login once: `bore login`
+3. Start tunnel: `bore start my-server`
+
+No need to remember server addresses! See `USER_GUIDE_MANAGED.md` for details.
+
+#### Option 2: Direct Tunnels (Legacy)
+
+**Best for:** Quick one-off tunnels, testing
 
 ```bash
 # Expose localhost:8000 using your API key
@@ -92,7 +92,21 @@ bore 8000 --to tunnel.yourservice.com --secret sk_live_your_api_key
 #   Forwarding to: localhost:8000
 ```
 
-Share the public URL with anyone. Each user can run multiple tunnels (within their plan limits).
+---
+
+### For Server Operators
+
+Run a bore server with backend authentication:
+
+```bash
+bore-server \
+  --backend-url https://api.yourservice.com \
+  --server-id us-east-1 \
+  --min-port 10000 \
+  --max-port 20000
+```
+
+See `SERVER_GUIDE.md` and `BACKEND_API_SPEC.md` for complete setup instructions.
 
 ---
 
@@ -135,13 +149,17 @@ Detailed flow, request/response formats, and mock backend examples are in `AUTHE
 
 ## Documentation
 
+### For Users
+- **[USER_GUIDE_MANAGED.md](USER_GUIDE_MANAGED.md)** – **NEW!** Managed tunnels user guide (recommended)
+- **[CLIENT_GUIDE.md](CLIENT_GUIDE.md)** – Legacy direct tunnel usage
+
+### For Developers & Operators
+- **[BACKEND_API_SPEC.md](BACKEND_API_SPEC.md)** – **NEW!** Backend API specification for managed tunnels
+- **[NEW_ARCHITECTURE.md](NEW_ARCHITECTURE.md)** – **NEW!** Complete architecture overview
+- **[SERVER_GUIDE.md](SERVER_GUIDE.md)** – Deploying and operating bore servers
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** – Backend API contract and tunnel lifecycle
 - **[INSTALLATION.md](INSTALLATION.md)** – Complete installation guide for all platforms
 - **[MIGRATION.md](MIGRATION.md)** – Migration guide from old single-binary setup
-- `SERVER_GUIDE.md` – Deploying and operating bore servers
-- `CLIENT_GUIDE.md` – Installing and using the bore CLI
-- `AUTHENTICATION.md` – Backend API contract and tunnel lifecycle
-- `saas-architecture.md` – Complete SaaS architecture blueprint
-- `INTEGRATION_SUMMARY.md` – Quick overview & next steps
 
 ---
 
