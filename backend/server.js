@@ -138,9 +138,68 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token, user_id: user.id, name: user.name });
 });
 
+// Get all instances for authenticated user
+app.get('/api/instances', authenticateJWT, (req, res) => {
+  const userInstances = instances.filter(i => i.user_id === req.user.user_id);
+  res.json({ instances: userInstances });
+});
+
+// Legacy endpoint for backward compatibility
 app.get('/api/user/instances', authenticateJWT, (req, res) => {
   const userInstances = instances.filter(i => i.user_id === req.user.user_id);
   res.json({ instances: userInstances });
+});
+
+// Get single instance by ID
+app.get('/api/instances/:id', authenticateJWT, (req, res) => {
+  const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
+  
+  if (!instance) {
+    return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
+  }
+  
+  res.json(instance);
+});
+
+// Create new instance
+app.post('/api/instances', authenticateJWT, (req, res) => {
+  const { name, localPort, region } = req.body;
+  const userId = req.user.user_id;
+  
+  if (!name || !localPort) {
+    return res.status(400).json({ error: 'invalid_input', message: 'Name and local port are required' });
+  }
+  
+  const newInstance = {
+    id: 'inst_' + Math.random().toString(36).substring(7),
+    user_id: userId,
+    name,
+    localPort: localPort,
+    local_port: localPort, // Support both camelCase and snake_case
+    region: region || 'local',
+    server_region: region || 'local',
+    serverAddress: '127.0.0.1',
+    status: 'inactive',
+    publicUrl: null,
+    public_url: null
+  };
+  
+  instances.push(newInstance);
+  
+  res.json(newInstance);
+});
+
+// Delete instance
+app.delete('/api/instances/:id', authenticateJWT, (req, res) => {
+  const instanceIndex = instances.findIndex(i => i.id === req.params.id && i.user_id === req.user.user_id);
+  
+  if (instanceIndex === -1) {
+    return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
+  }
+  
+  instances.splice(instanceIndex, 1);
+  
+  res.json({ success: true });
 });
 
 app.post('/api/user/instances/:id/connect', authenticateJWT, (req, res) => {

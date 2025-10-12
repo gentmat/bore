@@ -1,0 +1,89 @@
+════════════════════════════════════════════════════════════════
+                    BORE TUNNEL - SIMPLE GUIDE
+════════════════════════════════════════════════════════════════
+
+FOR END USERS (Your customers):
+────────────────────────────────────────────────────────────────
+
+WINDOWS:
+  1. Download: bore-tunnel-setup.exe
+  2. Double-click it
+  3. Click "Next" → "Install" → "Finish"
+  4. Find "Bore Tunnel" in Start Menu
+  5. Launch and login!
+
+macOS:
+  1. Download: bore-tunnel.dmg
+  2. Double-click it
+  3. Drag app to Applications folder
+  4. Open Applications → Double-click Bore Tunnel
+  5. Login and use!
+
+LINUX (Easy - all distros):
+  1. Download: bore-tunnel.AppImage
+  2. Right-click → Properties → Permissions
+  3. Check "Allow executing as program"
+  4. Double-click to run
+  5. Login and use!
+
+LINUX (Ubuntu/Debian):
+  1. Download: bore-tunnel.deb
+  2. Double-click it
+  3. Click "Install" → Enter password
+  4. Find in applications menu
+  5. Login and use!
+
+LINUX (Fedora/RHEL):
+  1. Download: bore-tunnel.rpm
+  2. Double-click it
+  3. Click "Install" → Enter password
+  4. Find in applications menu
+  5. Login and use!
+
+════════════════════════════════════════════════════════════════
+
+FOR YOU (The developer):
+────────────────────────────────────────────────────────────────
+
+BUILD INSTALLERS:
+
+  Linux/macOS:
+    cd bore-gui
+    chmod +x build-installers.sh
+    ./build-installers.sh
+
+  Windows:
+    cd bore-gui
+    build-installers.bat
+
+FIND INSTALLERS:
+  
+  Look in: bore-gui/release/
+  
+  Files to share with users:
+    - bore-tunnel-setup.exe  (Windows)
+    - bore-tunnel.dmg        (macOS)
+    - bore-tunnel.AppImage   (Linux - all)
+    - bore-tunnel.deb        (Ubuntu/Debian)
+    - bore-tunnel.rpm        (Fedora/RHEL)
+
+SHARE WITH USERS:
+  
+  1. Copy files from release/ folder
+  2. Upload to Google Drive / Dropbox / website
+  3. Share download link
+  4. Include USER_INSTALLATION_GUIDE.md
+
+════════════════════════════════════════════════════════════════
+
+THAT'S IT! 🎉
+
+Users just download and double-click. No command line needed!
+
+Need more help? See these files:
+  - START_HERE.md (overview)
+  - USER_INSTALLATION_GUIDE.md (for users)
+  - BUILDING_FOR_USERS.md (for you)
+  - BUILD_INSTALLERS.md (detailed guide)
+
+════════════════════════════════════════════════════════════════

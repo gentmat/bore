@@ -32,3 +32,9 @@ bore 8080 --to 127.0.0.1 --secret temp_token_ves7j
 
 
 bore-server --bind-addr 127.0.0.1 --bind-tunnels 127.0.0.1 --backend-url http://127.0.0.1:3000
+
+
+-------------------------
+to install appimage and deb ...
+cd bore-gui  
+./build-installers.sh 

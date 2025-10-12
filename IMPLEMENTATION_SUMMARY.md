@@ -1,405 +1,177 @@
-# Implementation Summary: Managed Tunnels
+# Bore GUI Implementation Summary
 
-This document summarizes the changes made to implement the managed tunnel system.
+## Changes Implemented
 
-## What Changed
+### 1. Sign Up Functionality ✅
 
-### Client Architecture
+**Frontend (bore-gui):**
+- Created `SignUpPage.tsx` component with form for name, email, password, and confirm password
+- Updated `LoginPage.tsx` to include "Sign Up" link
+- Updated `App.tsx` to handle both login and signup flows with state management
+- No email verification required - accounts activate immediately
 
-The bore client now supports two modes:
+**Backend (Rust - commands.rs):**
+- Added `signup` command that calls backend API `/api/auth/signup`
+- Automatically saves credentials and logs user in after successful signup
+- Registered new command in `main.rs`
 
-1. **Managed Mode (NEW)**: Users authenticate via web dashboard and CLI
-2. **Legacy Mode**: Direct tunnel with `--to` and `--secret` (still works)
+**Backend (Node.js - server.js):**
+- Existing `/api/auth/signup` endpoint already supported
+- Returns `user_id` and `token` on successful signup
+- Auto-activates accounts without email verification
 
-### New CLI Commands
+### 2. Code-Server Auto-Installation ✅
 
-| Command | Description |
-|---------|-------------|
-| `bore login` | Authenticate with email/password |
-| `bore logout` | Remove stored credentials |
-| `bore list` | List all tunnel instances |
-| `bore start <name>` | Start a tunnel by instance name/ID |
-| `bore stop` | Stop tunnel (placeholder) |
+**Implementation:**
+- Added `check_code_server_installed()` command - checks if code-server is available
+- Added `install_code_server()` command - downloads and installs code-server from official script
+- Uses `curl -fsSL https://code-server.dev/install.sh | sh` installation method
+- Checks run automatically when user logs in (only installs if not found)
 
-### New Files Created
+### 3. Bore Client Detection ✅
 
-#### Client Code
-- `bore-client/src/auth.rs` - Credential management
-- `bore-client/src/api_client.rs` - Backend API communication
+**Implementation:**
+- Detects bore client installation (tries `bore-client` then `bore` commands)
+- Works with both global cargo installations and local builds
+- Returns helpful error message if bore client not found
+- Automatically determines which command name to use
 
-#### Documentation
-- `NEW_ARCHITECTURE.md` - Complete architecture design
-- `BACKEND_API_SPEC.md` - API specification for backend implementation
-- `USER_GUIDE_MANAGED.md` - User guide for managed tunnels
-- `IMPLEMENTATION_SUMMARY.md` - This file
+### 4. Port Management & Auto-Start ✅
 
-### Modified Files
-- `bore-client/src/main.rs` - Added new commands and handlers
-- `bore-client/src/client.rs` - Hide public URL in managed mode
-- `bore-client/Cargo.toml` - Added dependencies
-- `README.md` - Updated documentation links and quick start
+**Implementation:**
+- Added `find_available_port_command()` - finds first available port starting from 8081
+- Uses TCP socket binding to check port availability
+- Automatically increments port number until free port found
+- Integrated into instance creation workflow
 
----
+**Auto-Start Flow:**
+1. Find available port (starting from 8081)
+2. Start bore tunnel: `bore <port> --to 127.0.0.1`
+3. Start code-server: `code-server --bind-addr 127.0.0.1:<port>`
+4. Both services use the same port (code-server on localhost, bore forwards it)
 
-## User Experience Changes
+### 5. Instance Creation Workflow ✅
 
-### Before (Legacy)
-```bash
-$ bore 8080 --to tunnel.example.com --secret sk_live_abc123
+**New Workflow:**
+- On first login, automatically checks for code-server and installs if needed
+- Creates first instance automatically if user has no instances
+- User can only edit the instance name (all other settings auto-configured)
+- Instance is created and started in one operation
+- Backend API stores instance metadata
 
-✓ Tunnel established!
-  Public URL: tunnel.example.com:15234
-  Forwarding to: localhost:8080
-```
+**Updated Components:**
+- `CreateInstanceModal.tsx` - simplified to only allow name editing
+- Shows info banner about auto-configuration
+- Automatically finds port and starts services
 
-**Problems:**
-- User must remember server address
-- User must copy/paste API key
-- Public URL shown in CLI (security concern per user request)
-- Hard to manage multiple tunnels
+### 6. Backend API Updates ✅
 
-### After (Managed)
-```bash
-$ bore login
-Email: user@example.com
-Password: 
-✓ Successfully logged in!
+**New Endpoints:**
+- `GET /api/instances` - List all instances for authenticated user
+- `GET /api/instances/:id` - Get single instance details
+- `POST /api/instances` - Create new instance
+- `DELETE /api/instances/:id` - Delete instance
 
-$ bore start my-web-server
-✓ Connected to "my-web-server"
-✓ Forwarding localhost:8080
-
-# Public URL visible only in web dashboard
-```
-
-**Benefits:**
-- No server address to remember
-- Login once, use everywhere
-- Public URL managed in dashboard (per user request)
-- Easy to manage multiple instances
-- Better for teams and production use
-
----
-
-## What Works Now
-
-✅ **Client Implementation**
-- Login command with email/password
-- Logout command
-- List instances command
-- Start instance command
-- Credential storage in `~/.bore/credentials.json`
-- Secure file permissions (Unix)
-- API client for backend communication
-- Backwards compatibility with legacy mode
-
-✅ **Documentation**
-- Architecture design document
-- Backend API specification
-- User guide
-- Updated README
-
-✅ **Build**
-- Compiles successfully
-- All dependencies resolved
-
----
-
-## What's Needed: Backend Implementation
-
-### 1. Database Tables
-
-```sql
--- User instances/tunnel configurations
-CREATE TABLE instances (
-  id VARCHAR(255) PRIMARY KEY,
-  user_id VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  local_port INT NOT NULL,
-  server_region VARCHAR(100),
-  status VARCHAR(50) DEFAULT 'inactive',
-  public_url VARCHAR(255),
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, name)
-);
-
--- Temporary tunnel tokens
-CREATE TABLE tunnel_tokens (
-  token VARCHAR(255) PRIMARY KEY,
-  user_id VARCHAR(255) NOT NULL,
-  instance_id VARCHAR(255) NOT NULL,
-  server_host VARCHAR(255) NOT NULL,
-  remote_port INT NOT NULL,
-  expires_at TIMESTAMP NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 2. API Endpoints
-
-**Authentication:**
-- `POST /api/auth/login` - User login
-
-**Instance Management:**
-- `GET /api/user/instances` - List user's instances
-- `POST /api/user/instances/{id}/connect` - Get connection info
-
-**Bore Server Integration:**
-- `POST /api/internal/validate-key` - Validate tunnel tokens (UPDATE EXISTING)
-
-See `BACKEND_API_SPEC.md` for complete specifications.
-
-### 3. Web Dashboard
-
-**Features needed:**
-- User registration/login
-- View instances list
-- Create new instance (name, local_port, region)
-- Edit instance
-- Delete instance
-- View active tunnel status
-- Display public URLs for active tunnels
-
----
-
-## Testing the Client
-
-### Prerequisites
-```bash
-# Build the client
-cd /home/maroun/Documents/bore
-cargo build --release -p bore-client
-```
-
-### Test Login (requires backend)
-```bash
-bore login --api-endpoint http://localhost:4000
-# Should prompt for email/password
-# Should save credentials to ~/.bore/credentials.json
-```
-
-### Test List (requires backend)
-```bash
-bore list
-# Should show user's instances
-```
-
-### Test Start (requires backend)
-```bash
-bore start my-instance
-# Should connect to instance and start tunnel
-```
-
-### Test Legacy Mode (works now)
-```bash
-bore 8080 --to 127.0.0.1 --secret sk_test_local
-# Should work as before (backwards compatible)
-```
-
----
-
-## Next Steps
-
-### For Backend Developers
-
-1. **Week 1: Core API**
-   - Implement login endpoint
-   - Implement list instances endpoint
-   - Update validate-key endpoint for tunnel tokens
-
-2. **Week 2: Instance Management**
-   - Implement connect endpoint
-   - Add port allocation logic
-   - Add token generation and cleanup
-
-3. **Week 3: Web Dashboard**
-   - User authentication UI
-   - Instance management UI
-   - Status display
-
-4. **Week 4: Testing & Polish**
-   - End-to-end testing
-   - Error handling
-   - Rate limiting
-   - Documentation
-
-### For QA/Testing
-
-Test cases:
-- [ ] User can register and login
-- [ ] User can create instances in dashboard
-- [ ] CLI login stores credentials
-- [ ] CLI list shows instances
-- [ ] CLI start connects successfully
-- [ ] Public URL not shown in CLI
-- [ ] Public URL visible in dashboard
-- [ ] Multiple tunnels can run simultaneously
-- [ ] Legacy mode still works
-- [ ] Expired tokens are rejected
-- [ ] Wrong credentials are rejected
-
----
-
-## API Endpoint Details
-
-### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
+**Instance Schema:**
+```javascript
 {
-  "email": "user@example.com",
-  "password": "user_password"
-}
-
-Response 200:
-{
-  "token": "eyJhbGc...",
-  "user_id": "user_123"
+  id: string,
+  user_id: string,
+  name: string,
+  localPort: number,
+  local_port: number,  // snake_case support
+  region: string,
+  serverAddress: string,
+  status: string,
+  publicUrl: string | null,
+  public_url: string | null  // snake_case support
 }
 ```
 
-### List Instances
-```http
-GET /api/user/instances
-Authorization: Bearer <token>
+### 7. Dashboard Auto-Start Logic ✅
 
-Response 200:
-{
-  "instances": [
-    {
-      "id": "inst_abc",
-      "name": "my-server",
-      "local_port": 8080,
-      "server_region": "us-east-1",
-      "status": "inactive",
-      "public_url": null
-    }
-  ]
-}
-```
+**Implementation:**
+- On dashboard mount, runs `initializeCodeServer()`
+- Checks if user has existing instances
+- Only creates new instance if user has zero instances
+- Shows loading indicator during initialization
+- User can manually create additional instances via "New Instance" button
 
-### Connect Instance
-```http
-POST /api/user/instances/inst_abc/connect
-Authorization: Bearer <token>
+## Files Modified
 
-Response 200:
-{
-  "instance_id": "inst_abc",
-  "tunnel_token": "temp_xyz789",
-  "server_host": "us-east-1.example.com",
-  "local_port": 8080,
-  "remote_port": 15234,
-  "ttl": 3600
-}
-```
+### Frontend (TypeScript/React)
+- `/bore-gui/src/App.tsx` - Added signup flow
+- `/bore-gui/src/components/LoginPage.tsx` - Added signup link
+- `/bore-gui/src/components/SignUpPage.tsx` - **NEW** - Signup form
+- `/bore-gui/src/components/Dashboard.tsx` - Auto-initialization logic
+- `/bore-gui/src/components/CreateInstanceModal.tsx` - Simplified to name-only
 
-See `BACKEND_API_SPEC.md` for complete details.
+### Backend (Rust)
+- `/bore-gui/src-tauri/src/commands.rs` - Added 5 new commands
+- `/bore-gui/src-tauri/src/main.rs` - Registered new commands
 
----
+### Backend (Node.js)
+- `/backend/server.js` - Added new instance management endpoints
 
-## Security Considerations
+## Usage Flow
 
-### Client Side
-- ✅ Credentials stored with 600 permissions (Unix)
-- ✅ Password input hidden (using rpassword)
-- ✅ JWT tokens used for authentication
-- ✅ HTTPS for API communication (when deployed)
+### For New Users:
+1. User opens bore-gui
+2. Clicks "Sign Up" 
+3. Enters name, email, password
+4. Account created and auto-activated
+5. Redirected to dashboard
+6. Code-server auto-installs (if needed)
+7. First instance auto-created with available port
+8. Bore tunnel and code-server auto-start
+9. Instance visible in dashboard
 
-### Backend Side
-- ⚠️ TODO: Implement JWT signing/verification
-- ⚠️ TODO: Password hashing (bcrypt)
-- ⚠️ TODO: Rate limiting on login
-- ⚠️ TODO: Tunnel token expiration
-- ⚠️ TODO: HTTPS enforcement
+### For Existing Users:
+1. User opens bore-gui
+2. Logs in with email/password
+3. Dashboard loads existing instances
+4. User can create additional instances manually
+5. Each new instance auto-configures port and starts services
 
----
+### Web Portal Integration:
+- When user logs into website with same credentials
+- They see the same running instances
+- Instance list synced via backend API
+- No "Connect" button needed - instances shown if running
 
-## Breaking Changes
+## Technical Notes
 
-**None!** This is fully backwards compatible.
+### Port Selection:
+- Starts checking from port 8081
+- Increments until available port found
+- Same port used for both code-server and bore tunnel
+- Code-server binds to 127.0.0.1:<port>
+- Bore forwards that port to the tunnel server
 
-Users can still use:
-```bash
-bore 8080 --to server.com --secret sk_live_key
-```
+### Bore Server:
+- Currently hardcoded to connect to `127.0.0.1:7835`
+- Can be changed later to use custom bore server
+- Uses user's token as tunnel secret
 
-The new managed mode is opt-in.
+### Process Management:
+- Code-server spawned as child process
+- Bore tunnel runs in tokio task
+- Handles stored in app state for cleanup
+- Stopped when user logs out or closes app
 
----
+## Known Limitations
 
-## Questions & Answers
+1. **Bore client must be pre-installed** - The GUI doesn't auto-install bore client yet
+2. **Process cleanup** - May need better process management on app restart
+3. **Port conflicts** - If code-server crashes but port still bound, need manual cleanup
+4. **Error handling** - Some edge cases may need more graceful error messages
 
-**Q: Will old CLI versions still work?**
-A: Yes, the legacy mode is fully supported.
+## Next Steps (Optional Future Enhancements)
 
-**Q: Can users mix legacy and managed mode?**
-A: Yes, they can use `bore login` for some tunnels and `--secret` for others.
-
-**Q: Where are credentials stored?**
-A: `~/.bore/credentials.json` with 600 permissions on Unix.
-
-**Q: Can users have multiple accounts?**
-A: Currently no, but you can logout and login with different credentials.
-
-**Q: How do teams share instances?**
-A: This requires backend support for team/organization features (future work).
-
----
-
-## Performance Considerations
-
-- JWT validation is fast
-- Tunnel token lookup requires database query (add index on `token`)
-- Instance listing requires database query (add index on `user_id`)
-- Consider caching for validate-key endpoint (high traffic)
-
----
-
-## Monitoring & Analytics
-
-Recommended metrics to track:
-- Login attempts (success/failure)
-- Active tunnel count per user
-- Tunnel duration
-- Data transferred per tunnel
-- Instance creation rate
-- Token expiration/renewal rate
-
----
-
-## Future Enhancements
-
-Potential features for future releases:
-- `bore stop` command (graceful shutdown)
-- `bore status` command (show current tunnel status)
-- `bore logs` command (view tunnel logs)
-- Team/organization support
-- Custom domains per instance
-- Tunnel analytics in CLI
-- Auto-reconnect on disconnect
-- Config file support (`~/.bore/config.yaml`)
-
----
-
-## Support
-
-For questions or issues:
-- Read `NEW_ARCHITECTURE.md` for design overview
-- Read `BACKEND_API_SPEC.md` for API details
-- Read `USER_GUIDE_MANAGED.md` for user documentation
-- Open an issue on GitHub
-
----
-
-## Success Criteria
-
-✅ Client implementation complete
-✅ Documentation complete
-⏳ Backend API implementation
-⏳ Web dashboard implementation
-⏳ End-to-end testing
-⏳ Production deployment
-
-**Status: Ready for Backend Implementation**
+1. Add bore client auto-installation
+2. Add process health monitoring
+3. Add manual port selection option (advanced users)
+4. Add logs viewer in GUI
+5. Add bore server selection (allow custom servers)
+6. Add instance templates/presets
+7. Add resource usage monitoring

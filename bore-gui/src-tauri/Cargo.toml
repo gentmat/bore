@@ -1,0 +1,33 @@
+[package]
+name = "bore-gui"
+version = "0.1.0"
+edition = "2021"
+authors = ["bore contributors"]
+license = "MIT"
+description = "Cross-platform GUI application for bore tunnel client"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "notification-all", "shell-open", "system-tray", "notification"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+dirs = "5.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+bore-shared = { path = "../../bore-shared" }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[workspace]
+# This tells Cargo that bore-gui is a standalone project,
+# not part of the parent bore workspace
