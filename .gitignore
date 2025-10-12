@@ -1,3 +1,24 @@
+# Rust / Tauri / Cargo build outputs
 /target
- /bore-gui/release
- /bore-gui/src-tauri/target/release/bundle
+/bore-gui/src-tauri/target
+
+# Release bundles
+/bore-gui/release
+/bore-gui/src-tauri/target/release/bundle
+
+# Node / frontend
+/node_modules
+/dist
+/build
+
+# IDE / editor files
+*.idea/
+*.vscode/
+*.swp
+*.DS_Store
+
+# Logs
+*.log
+
+# OS generated files
+Thumbs.db
