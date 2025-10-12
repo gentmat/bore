@@ -1,1 +1,3 @@
 /target
+ /bore-gui/release
+ /bore-gui/src-tauri/target/release/bundle
