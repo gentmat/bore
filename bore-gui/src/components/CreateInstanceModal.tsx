@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
-import { X, Loader2 } from "lucide-react";
+import { open } from "@tauri-apps/api/dialog";
+import { X, Loader2, Folder } from "lucide-react";
 
 interface CreateInstanceModalProps {
   onClose: () => void;
@@ -12,12 +13,34 @@ export default function CreateInstanceModal({
   onCreate,
 }: CreateInstanceModalProps) {
   const [name, setName] = useState(`code-server-${Date.now()}`);
+  const [projectPath, setProjectPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const handleSelectFolder = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Project Folder",
+      });
+      if (selected && typeof selected === "string") {
+        setProjectPath(selected);
+      }
+    } catch (err: any) {
+      console.error("Failed to select folder:", err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!projectPath) {
+      setError("Please select a project folder");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -26,10 +49,11 @@ export default function CreateInstanceModal({
         startPort: 8081 
       });
       
-      // Start code-server instance with auto-configured settings
+      // Start code-server instance with project folder
       await invoke("start_code_server_instance", {
         port: availablePort,
         instanceName: name,
+        projectPath: projectPath,
       });
       
       onCreate();
@@ -79,6 +103,34 @@ export default function CreateInstanceModal({
             />
             <p className="mt-1 text-xs text-gray-500">
               A friendly name to identify your code-server instance
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Project Folder
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={projectPath}
+                readOnly
+                className="input-field flex-1 bg-gray-50"
+                placeholder="Select a folder for your project"
+                required
+              />
+              <button
+                type="button"
+                onClick={handleSelectFolder}
+                disabled={loading}
+                className="btn-secondary flex items-center space-x-2 whitespace-nowrap"
+              >
+                <Folder className="w-4 h-4" />
+                <span>Browse</span>
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              The folder where code-server will open your project
             </p>
           </div>
 

@@ -29,26 +29,22 @@ const users = [
 
 const userPlans = {}; // Store user plans
 
-const instances = [
-  {
-    id: 'inst_001',
-    user_id: 'user_123',
-    name: 'my-dev-server',
-    local_port: 8080,
-    server_region: 'us-east-1',
-    status: 'inactive',
-    public_url: null
-  },
-  {
-    id: 'inst_002',
-    user_id: 'user_123',
-    name: 'my-api',
-    local_port: 3001,
-    server_region: 'eu-west-1',
-    status: 'active',
-    public_url: 'eu-west-1.tunnels.example.com:15234'
+const instances = [];
+
+// Track instance heartbeats for online/offline status
+const instanceHeartbeats = new Map(); // instanceId -> lastHeartbeat timestamp
+const HEARTBEAT_TIMEOUT = 15000; // 15 seconds
+
+// Periodically check for offline instances
+setInterval(() => {
+  const now = Date.now();
+  for (const instance of instances) {
+    const lastHeartbeat = instanceHeartbeats.get(instance.id);
+    if (lastHeartbeat && (now - lastHeartbeat) > HEARTBEAT_TIMEOUT) {
+      instance.status = 'offline';
+    }
   }
-];
+}, 5000); // Check every 5 seconds
 
 // Middleware to verify JWT
 const authenticateJWT = (req, res, next) => {
@@ -102,17 +98,6 @@ app.post('/api/auth/signup', async (req, res) => {
   };
   
   users.push(newUser);
-  
-  // Create default instance for new user
-  instances.push({
-    id: 'inst_' + Math.random().toString(36).substring(7),
-    user_id: userId,
-    name: 'my-first-tunnel',
-    local_port: 8080,
-    server_region: 'us-east-1',
-    status: 'inactive',
-    public_url: null
-  });
   
   // Generate JWT
   const token = jwt.sign({ user_id: userId }, JWT_SECRET, { expiresIn: '30d' });
@@ -197,7 +182,43 @@ app.delete('/api/instances/:id', authenticateJWT, (req, res) => {
     return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
   }
   
+  // Remove heartbeat tracking
+  instanceHeartbeats.delete(req.params.id);
+  
   instances.splice(instanceIndex, 1);
+  
+  res.json({ success: true });
+});
+
+// Rename instance
+app.patch('/api/instances/:id', authenticateJWT, (req, res) => {
+  const { name } = req.body;
+  const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
+  
+  if (!instance) {
+    return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
+  }
+  
+  if (!name) {
+    return res.status(400).json({ error: 'invalid_input', message: 'Name is required' });
+  }
+  
+  instance.name = name;
+  
+  res.json({ success: true, instance });
+});
+
+// Instance heartbeat endpoint - clients call this to indicate they're online
+app.post('/api/instances/:id/heartbeat', authenticateJWT, (req, res) => {
+  const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
+  
+  if (!instance) {
+    return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
+  }
+  
+  // Update heartbeat timestamp
+  instanceHeartbeats.set(instance.id, Date.now());
+  instance.status = 'online';
   
   res.json({ success: true });
 });
@@ -215,7 +236,9 @@ app.post('/api/user/instances/:id/connect', authenticateJWT, (req, res) => {
   // Use actual bore server address (from environment or default to localhost)
   const boreServerHost = process.env.BORE_SERVER_HOST || '127.0.0.1';
   
-  instance.status = 'active';
+  // Mark as online and update heartbeat
+  instance.status = 'online';
+  instanceHeartbeats.set(instance.id, Date.now());
   instance.public_url = `${boreServerHost}:${remote_port || 'auto'}`;
   
   res.json({
@@ -235,8 +258,9 @@ app.post('/api/user/instances/:id/disconnect', authenticateJWT, (req, res) => {
     return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
   }
   
-  instance.status = 'inactive';
+  instance.status = 'offline';
   instance.public_url = null;
+  instanceHeartbeats.delete(instance.id);
   
   res.json({ success: true, instance });
 });
@@ -269,20 +293,6 @@ app.post('/api/user/claim-plan', authenticateJWT, (req, res) => {
   // Update user plan
   user.plan = plan;
   user.plan_expires = expiresAt.toISOString();
-  
-  // Create a default instance if user doesn't have any
-  const userInstances = instances.filter(i => i.user_id === userId);
-  if (userInstances.length === 0) {
-    instances.push({
-      id: 'inst_' + Math.random().toString(36).substring(7),
-      user_id: userId,
-      name: 'my-first-tunnel',
-      local_port: 8080,
-      server_region: 'local',
-      status: 'inactive',
-      public_url: null
-    });
-  }
   
   res.json({
     success: true,

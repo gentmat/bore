@@ -1,4 +1,4 @@
-import { Play, Square, Trash2, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Play, Square, Trash2, Copy, ExternalLink, CheckCircle2, Edit2, Check, X } from "lucide-react";
 import { TunnelInstance } from "./Dashboard";
 import { useState } from "react";
 
@@ -7,6 +7,7 @@ interface TunnelCardProps {
   onStart: () => void;
   onStop: () => void;
   onDelete: () => void;
+  onRename: (newName: string) => void;
 }
 
 export default function TunnelCard({
@@ -14,8 +15,11 @@ export default function TunnelCard({
   onStart,
   onStop,
   onDelete,
+  onRename,
 }: TunnelCardProps) {
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(instance.name);
 
   const isActive = instance.status === "active";
   const isStarting = instance.status === "starting";
@@ -26,6 +30,18 @@ export default function TunnelCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleRename = () => {
+    if (editName.trim() && editName !== instance.name) {
+      onRename(editName.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditName(instance.name);
+    setIsEditing(false);
   };
 
   const statusColor = {
@@ -47,9 +63,48 @@ export default function TunnelCard({
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-            {instance.name}
-          </h3>
+          {isEditing ? (
+            <div className="flex items-center space-x-2 mb-1">
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') handleCancelEdit();
+                }}
+                className="flex-1 px-2 py-1 text-lg font-semibold border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                autoFocus
+              />
+              <button
+                onClick={handleRename}
+                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                title="Save"
+              >
+                <Check className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                title="Cancel"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2 mb-1">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {instance.name}
+              </h3>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                title="Rename instance"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-center space-x-2">
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
               <span className={`w-2 h-2 rounded-full mr-1.5 ${statusDot}`}></span>

@@ -30,58 +30,12 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [initializingCodeServer, setInitializingCodeServer] = useState(false);
 
   useEffect(() => {
-    initializeCodeServer();
     loadInstances();
     const interval = setInterval(loadInstances, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
   }, []);
-
-  const initializeCodeServer = async () => {
-    try {
-      setInitializingCodeServer(true);
-      
-      // Load existing instances first
-      const existingInstances = await invoke<TunnelInstance[]>("list_instances");
-      
-      // Only create new instance if user has none
-      if (existingInstances.length === 0) {
-        console.log("No instances found, creating first instance...");
-        
-        // Check if code-server is installed
-        const isInstalled = await invoke<boolean>("check_code_server_installed");
-        
-        if (!isInstalled) {
-          console.log("code-server not installed, installing...");
-          await invoke("install_code_server");
-        }
-        
-        // Find available port starting from 8081
-        const availablePort = await invoke<number>("find_available_port_command", { 
-          startPort: 8081 
-        });
-        
-        console.log("Found available port:", availablePort);
-        
-        // Start code-server instance
-        const instanceId = await invoke<string>("start_code_server_instance", {
-          port: availablePort,
-          instanceName: `code-server-${Date.now()}`,
-        });
-        
-        console.log("Started code-server instance:", instanceId);
-      } else {
-        console.log("User already has instances, skipping auto-creation");
-      }
-      
-    } catch (error) {
-      console.error("Failed to initialize code-server:", error);
-    } finally {
-      setInitializingCodeServer(false);
-    }
-  };
 
   const loadInstances = async () => {
     try {
@@ -137,6 +91,16 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
       await loadInstances();
     } catch (error) {
       console.error("Failed to delete instance:", error);
+    }
+  };
+
+  const handleRenameInstance = async (instanceId: string, newName: string) => {
+    try {
+      await invoke("rename_instance", { instanceId, newName });
+      await loadInstances();
+    } catch (error) {
+      console.error("Failed to rename instance:", error);
+      alert("Failed to rename instance: " + error);
     }
   };
 
@@ -209,15 +173,6 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        {initializingCodeServer && (
-          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-              <p className="text-blue-800">Setting up code-server environment...</p>
-            </div>
-          </div>
-        )}
-        
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -268,6 +223,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
                 onStart={() => handleStartTunnel(instance.id)}
                 onStop={() => handleStopTunnel(instance.id)}
                 onDelete={() => handleDeleteInstance(instance.id)}
+                onRename={(newName) => handleRenameInstance(instance.id, newName)}
               />
             ))}
           </div>

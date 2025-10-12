@@ -56,6 +56,7 @@ fn main() {
             get_tunnel_status,
             create_instance,
             delete_instance,
+            rename_instance,
             check_code_server_installed,
             install_code_server,
             find_available_port_command,

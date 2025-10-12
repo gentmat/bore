@@ -22,3 +22,6 @@
 
 # OS generated files
 Thumbs.db
+bore-gui/release/bore-tunnel.deb
+bore-gui/release/bore-tunnel.rpm
+bore-gui/release/bore-tunnel.AppImage

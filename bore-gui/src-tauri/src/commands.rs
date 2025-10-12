@@ -504,6 +504,7 @@ pub async fn start_code_server_instance(
     state: State<'_, AppState>,
     port: u16,
     instance_name: String,
+    project_path: Option<String>,
 ) -> Result<String, String> {
     let creds = state.credentials.read().await;
     let creds = creds
@@ -521,14 +522,21 @@ pub async fn start_code_server_instance(
     
     tracing::info!("Using bore client: {}", bore_cmd);
     
-    // Start code-server
-    let code_server_command = format!("code-server --bind-addr 127.0.0.1:{}", port);
-    tracing::info!("Starting code-server: {}", code_server_command);
+    // Start code-server with project path
+    let mut cmd = Command::new("code-server");
+    cmd.arg("--bind-addr")
+        .arg(format!("127.0.0.1:{}", port));
+    
+    // Add project path if provided
+    if let Some(path) = &project_path {
+        cmd.arg(path);
+        tracing::info!("Starting code-server on port {} with project path: {}", port, path);
+    } else {
+        tracing::info!("Starting code-server on port {} without specific project path", port);
+    }
     
     // Start code-server in background
-    let _child = Command::new("code-server")
-        .arg("--bind-addr")
-        .arg(format!("127.0.0.1:{}", port))
+    let _child = cmd
         .spawn()
         .map_err(|e| format!("Failed to start code-server: {}", e))?;
     
@@ -585,4 +593,34 @@ pub async fn start_code_server_instance(
     handles.insert(instance_id.clone(), handle);
     
     Ok(instance_id)
+}
+
+#[tauri::command]
+pub async fn rename_instance(
+    state: State<'_, AppState>,
+    instance_id: String,
+    new_name: String,
+) -> Result<bool, String> {
+    let creds = state.credentials.read().await;
+    let creds = creds
+        .as_ref()
+        .ok_or("Not authenticated")?;
+
+    // Rename instance via API
+    let client = reqwest::Client::new();
+    let response = client
+        .patch(format!("http://127.0.0.1:3000/api/instances/{}", instance_id))
+        .header("Authorization", format!("Bearer {}", creds.token))
+        .json(&serde_json::json!({
+            "name": new_name,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to rename instance: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err("Failed to rename instance".to_string());
+    }
+
+    Ok(true)
 }
