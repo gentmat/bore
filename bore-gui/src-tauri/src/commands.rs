@@ -313,8 +313,26 @@ pub async fn start_tunnel(
 
     let state_clone = state.inner().clone();
     let instance_id_clone = instance_id.clone();
+    let token_clone = creds.token.clone();
 
     let handle = tokio::spawn(async move {
+        // Start heartbeat task
+        let instance_id_heartbeat = instance_id_clone.clone();
+        let token_heartbeat = token_clone.clone();
+        tokio::spawn(async move {
+            let client = reqwest::Client::new();
+            loop {
+                // Send heartbeat every 10 seconds
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                
+                let _ = client
+                    .post(format!("http://127.0.0.1:3000/api/instances/{}/heartbeat", instance_id_heartbeat))
+                    .header("Authorization", format!("Bearer {}", token_heartbeat))
+                    .send()
+                    .await;
+            }
+        });
+
         match start_tunnel_connection(config).await {
             Ok(_) => {
                 // Update status to active
@@ -577,8 +595,26 @@ pub async fn start_code_server_instance(
     };
     
     let instance_id_clone = instance_id.clone();
+    let token_clone = creds.token.clone();
     
     let handle = tokio::spawn(async move {
+        // Start heartbeat task
+        let instance_id_heartbeat = instance_id_clone.clone();
+        let token_heartbeat = token_clone.clone();
+        tokio::spawn(async move {
+            let client = reqwest::Client::new();
+            loop {
+                // Send heartbeat every 10 seconds
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                
+                let _ = client
+                    .post(format!("http://127.0.0.1:3000/api/instances/{}/heartbeat", instance_id_heartbeat))
+                    .header("Authorization", format!("Bearer {}", token_heartbeat))
+                    .send()
+                    .await;
+            }
+        });
+
         match start_tunnel_connection(config).await {
             Ok(_) => {
                 tracing::info!("Tunnel started successfully for {}", instance_id_clone);

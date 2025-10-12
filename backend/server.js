@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // In-memory database (replace with real database in production)
 const users = [
   {
-    id: 'user_123',
+    id: 'user_demo',
     email: 'demo@bore.com',
     password_hash: bcrypt.hashSync('demo123', 10),
     name: 'Demo User',

@@ -100,7 +100,7 @@ function renderInstances() {
             </div>
             
             <div class="instance-actions">
-                ${instance.status === 'active' ? `
+                ${instance.status === 'online' ? `
                     <button class="btn btn-view btn-small" onclick="viewTunnel('${instance.id}', '${instance.name}', ${instance.local_port})">
                         View
                     </button>
@@ -108,8 +108,8 @@ function renderInstances() {
                         Disconnect
                     </button>
                 ` : `
-                    <button class="btn btn-success btn-small" onclick="connectInstance('${instance.id}')">
-                        Connect
+                    <button class="btn btn-success btn-small" onclick="connectInstance('${instance.id}')" disabled>
+                        ${instance.status === 'offline' ? 'Offline' : 'Waiting for client...'}
                     </button>
                 `}
             </div>

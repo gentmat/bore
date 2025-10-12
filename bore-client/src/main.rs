@@ -194,12 +194,14 @@ async fn handle_list() -> Result<()> {
 
     println!("Available instances:\n");
     for instance in instances {
-        let status_icon = match instance.status.as_str() {
-            "active" => "🟢",
-            "inactive" => "⚪",
-            _ => "🔵",
+        let (status_icon, status_text) = match instance.status.as_str() {
+            "online" => ("🟢", "Online"),
+            "offline" => ("🔴", "Offline"),
+            "active" => ("🟢", "Active"),
+            "inactive" => ("⚪", "Inactive"),
+            _ => ("🔵", "Unknown"),
         };
-        println!("  {} {} ({})", status_icon, instance.name, instance.id);
+        println!("  {} {} ({}) - {}", status_icon, instance.name, instance.id, status_text);
         println!("     Local port: {}", instance.local_port);
         println!("     Region: {}", instance.server_region);
         if let Some(url) = instance.public_url {
@@ -224,6 +226,23 @@ async fn handle_start(instance_name_or_id: String) -> Result<()> {
 
     println!("\n✓ Connected to \"{}\"", instance.name);
     println!("✓ Forwarding localhost:{}\n", connection_info.local_port);
+    
+    // Start heartbeat task to report online status
+    let instance_id = instance.id.clone();
+    let api_client_clone = ApiClient::from_credentials(&credentials);
+    tokio::spawn(async move {
+        use tokio::time::{interval, Duration};
+        let mut heartbeat_interval = interval(Duration::from_secs(10));
+        
+        loop {
+            heartbeat_interval.tick().await;
+            if let Err(e) = api_client_clone.send_heartbeat(&instance_id).await {
+                tracing::warn!("Failed to send heartbeat: {}", e);
+            } else {
+                tracing::debug!("Heartbeat sent for instance {}", instance_id);
+            }
+        }
+    });
     
     // Start the tunnel using the temporary token
     let client = Client::new(

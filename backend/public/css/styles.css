@@ -343,14 +343,24 @@ body {
     letter-spacing: 0.5px;
 }
 
+.status-online {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-offline {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
 .status-active {
     background: #d1fae5;
     color: #065f46;
 }
 
 .status-inactive {
-    background: #fee2e2;
-    color: #991b1b;
+    background: #f3f4f6;
+    color: #6b7280;
 }
 
 .instance-details {

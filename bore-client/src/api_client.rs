@@ -182,4 +182,25 @@ impl ApiClient {
         
         bail!("instance '{}' not found", name_or_id)
     }
+
+    /// Send heartbeat for an instance to indicate it's online
+    pub async fn send_heartbeat(&self, instance_id: &str) -> Result<()> {
+        let token = self.auth_token.as_ref()
+            .context("not authenticated")?;
+
+        let url = format!("{}/api/instances/{}/heartbeat", self.base_url, instance_id);
+        
+        let response = self.client
+            .post(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .context("failed to send heartbeat")?;
+
+        if !response.status().is_success() {
+            bail!("heartbeat failed with status {}", response.status());
+        }
+
+        Ok(())
+    }
 }
