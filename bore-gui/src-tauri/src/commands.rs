@@ -22,6 +22,7 @@ pub struct TunnelInstanceResponse {
     pub server_address: String,
     pub public_url: Option<String>,
     pub status: String,
+    pub error_message: Option<String>,
 }
 
 #[tauri::command]
@@ -240,6 +241,10 @@ pub async fn list_instances(state: State<'_, AppState>) -> Result<Vec<TunnelInst
             })
             .unwrap_or("inactive");
 
+        let error_message = tunnels
+            .get(&id)
+            .and_then(|t| t.error_message.clone());
+
         result.push(TunnelInstanceResponse {
             id: id.clone(),
             name: instance["name"].as_str().unwrap_or("").to_string(),
@@ -248,6 +253,7 @@ pub async fn list_instances(state: State<'_, AppState>) -> Result<Vec<TunnelInst
             server_address: instance["serverAddress"].as_str().unwrap_or("").to_string(),
             public_url: instance["publicUrl"].as_str().map(|s| s.to_string()),
             status: status.to_string(),
+            error_message,
         });
     }
 
@@ -300,6 +306,7 @@ pub async fn start_tunnel(
             server_address: server_address.clone(),
             public_url: json["publicUrl"].as_str().map(|s| s.to_string()),
             status: TunnelStatus::Starting,
+            error_message: None,
         },
     );
 
@@ -339,13 +346,16 @@ pub async fn start_tunnel(
                 let mut tunnels = state_clone.tunnels.write().await;
                 if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
                     tunnel.status = TunnelStatus::Active;
+                    tunnel.error_message = None;
                 }
             }
             Err(e) => {
-                tracing::error!("Tunnel error for {}: {}", instance_id_clone, e);
+                let error_msg = format!("{}", e);
+                tracing::error!("Tunnel error for {}: {}", instance_id_clone, error_msg);
                 let mut tunnels = state_clone.tunnels.write().await;
                 if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
                     tunnel.status = TunnelStatus::Error;
+                    tunnel.error_message = Some(error_msg);
                 }
             }
         }

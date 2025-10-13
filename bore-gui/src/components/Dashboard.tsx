@@ -23,6 +23,7 @@ export interface TunnelInstance {
   server_address: string;
   public_url: string | null;
   status: string;
+  error_message?: string;
 }
 
 export default function Dashboard({ credentials, onLogout }: DashboardProps) {
@@ -69,6 +70,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
       await loadInstances();
     } catch (error) {
       console.error("Failed to start tunnel:", error);
+      alert(`Failed to start tunnel: ${error}`);
     }
   };
 
@@ -78,6 +80,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
       await loadInstances();
     } catch (error) {
       console.error("Failed to stop tunnel:", error);
+      alert(`Failed to stop tunnel: ${error}`);
     }
   };
 

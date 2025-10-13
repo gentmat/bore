@@ -154,6 +154,14 @@ export default function TunnelCard({
             </div>
           </div>
         )}
+        {instance.error_message && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs font-medium text-red-800 mb-1">Error:</p>
+            <p className="text-xs text-red-700 break-words whitespace-pre-wrap">
+              {instance.error_message}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Actions */}

@@ -114,10 +114,11 @@ export default function CreateInstanceModal({
               <input
                 type="text"
                 value={projectPath}
-                readOnly
-                className="input-field flex-1 bg-gray-50"
+                onChange={(e) => setProjectPath(e.target.value)}
+                className="input-field flex-1"
                 placeholder="Select a folder for your project"
                 required
+                disabled={loading}
               />
               <button
                 type="button"

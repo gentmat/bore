@@ -19,6 +19,7 @@ pub struct TunnelInstance {
     pub server_address: String,
     pub public_url: Option<String>,
     pub status: TunnelStatus,
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
