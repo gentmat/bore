@@ -23,6 +23,7 @@ export interface TunnelInstance {
   region: string;
   server_address: string;
   public_url: string | null;
+  remote_port?: number | null;
   status: string;
   error_message?: string;
 }

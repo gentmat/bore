@@ -1,5 +1,7 @@
 const API_BASE = window.location.origin;
 let instances = [];
+const instanceElements = new Map();
+let isFirstLoad = true;
 
 // Check authentication
 const token = localStorage.getItem('token');
@@ -26,7 +28,9 @@ async function loadInstances() {
     const container = document.getElementById('instancesContainer');
     const emptyState = document.getElementById('emptyState');
     
-    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    if (isFirstLoad) {
+        container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    }
     
     try {
         const response = await fetch(`${API_BASE}/api/user/instances`, {
@@ -46,75 +50,168 @@ async function loadInstances() {
         
         const data = await response.json();
         instances = data.instances;
-        
-        if (instances.length === 0) {
+        if (isFirstLoad) {
             container.innerHTML = '';
-            emptyState.style.display = 'block';
-        } else {
-            emptyState.style.display = 'none';
-            renderInstances();
         }
-        
+        updateInstanceCards(instances, container, emptyState);
+        isFirstLoad = false;
+
     } catch (error) {
         container.innerHTML = `
             <div class="error-message show">
                 Failed to load instances: ${error.message}
             </div>
         `;
+        emptyState.style.display = 'none';
     }
 }
 
-function renderInstances() {
-    const container = document.getElementById('instancesContainer');
-    
-    container.innerHTML = instances.map(instance => `
-        <div class="instance-card">
-            <div class="instance-header">
-                <div>
-                    <div class="instance-name">${instance.name}</div>
-                    <div class="instance-region">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="2" y1="12" x2="22" y2="12"/>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                        </svg>
-                        ${instance.server_region}
-                    </div>
+function updateInstanceCards(newInstances, container, emptyState) {
+    const activeIds = new Set();
+
+    newInstances.forEach(instance => {
+        activeIds.add(instance.id);
+        let card = instanceElements.get(instance.id);
+
+        if (!card) {
+            card = createInstanceCard(instance);
+            instanceElements.set(instance.id, card);
+            container.appendChild(card);
+        } else {
+            updateInstanceCard(card, instance);
+        }
+    });
+
+    instanceElements.forEach((card, id) => {
+        if (!activeIds.has(id)) {
+            card.remove();
+            instanceElements.delete(id);
+        }
+    });
+
+    if (instanceElements.size === 0) {
+        emptyState.style.display = 'block';
+    } else {
+        emptyState.style.display = 'none';
+    }
+}
+
+function createInstanceCard(instance) {
+    const card = document.createElement('div');
+    card.className = 'instance-card';
+    card.dataset.instanceId = instance.id;
+    card.innerHTML = buildInstanceCardInnerHTML(instance);
+    bindCardActions(card, instance);
+    return card;
+}
+
+function updateInstanceCard(card, instance) {
+    const nameEl = card.querySelector('[data-field="name"]');
+    if (nameEl) {
+        nameEl.textContent = instance.name;
+    }
+
+    const regionEl = card.querySelector('[data-field="region"]');
+    if (regionEl) {
+        regionEl.textContent = instance.server_region;
+    }
+
+    const statusEl = card.querySelector('[data-field="status"]');
+    if (statusEl) {
+        statusEl.textContent = instance.status;
+        statusEl.className = `status-badge status-${instance.status}`;
+    }
+
+    const localPortEl = card.querySelector('[data-field="local_port"]');
+    if (localPortEl) {
+        localPortEl.textContent = instance.local_port;
+    }
+
+    const publicUrlRow = card.querySelector('[data-field="public_url_row"]');
+    const publicUrlEl = card.querySelector('[data-field="public_url"]');
+    if (publicUrlRow && publicUrlEl) {
+        if (instance.status === 'active' && instance.public_url) {
+            publicUrlEl.textContent = instance.public_url;
+            publicUrlRow.style.display = '';
+        } else {
+            publicUrlEl.textContent = '';
+            publicUrlRow.style.display = 'none';
+        }
+    }
+
+    const actionsContainer = card.querySelector('.instance-actions');
+    if (actionsContainer) {
+        actionsContainer.innerHTML = getActionsTemplate(instance);
+        bindCardActions(card, instance);
+    }
+}
+
+function buildInstanceCardInnerHTML(instance) {
+    const publicUrlVisible = instance.status === 'active' && instance.public_url;
+
+    return `
+        <div class="instance-header">
+            <div>
+                <div class="instance-name" data-field="name">${instance.name}</div>
+                <div class="instance-region">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span class="instance-region-text" data-field="region">${instance.server_region}</span>
                 </div>
-                <span class="status-badge status-${instance.status}">
-                    ${instance.status}
-                </span>
             </div>
-            
-            <div class="instance-details">
-                <div class="detail-row">
-                    <span class="detail-label">Local Port</span>
-                    <span class="detail-value">${instance.local_port}</span>
-                </div>
-                ${instance.status === 'active' && instance.public_url ? `
-                    <div class="detail-row">
-                        <span class="detail-label">Public URL</span>
-                        <span class="detail-value public-url">${instance.public_url}</span>
-                    </div>
-                ` : ''}
+            <span class="status-badge status-${instance.status}" data-field="status">
+                ${instance.status}
+            </span>
+        </div>
+        <div class="instance-details">
+            <div class="detail-row">
+                <span class="detail-label">Local Port</span>
+                <span class="detail-value" data-field="local_port">${instance.local_port}</span>
             </div>
-            
-            <div class="instance-actions">
-                ${instance.status === 'online' ? `
-                    <button class="btn btn-view btn-small" onclick="viewTunnel('${instance.id}', '${instance.name}', ${instance.local_port})">
-                        View
-                    </button>
-                    <button class="btn btn-danger btn-small" onclick="disconnectInstance('${instance.id}')">
-                        Disconnect
-                    </button>
-                ` : `
-                    <button class="btn btn-success btn-small" onclick="connectInstance('${instance.id}')" disabled>
-                        ${instance.status === 'offline' ? 'Offline' : 'Waiting for client...'}
-                    </button>
-                `}
+            <div class="detail-row" data-field="public_url_row" style="${publicUrlVisible ? '' : 'display: none;'}">
+                <span class="detail-label">Public URL</span>
+                <span class="detail-value public-url" data-field="public_url">${publicUrlVisible ? instance.public_url : ''}</span>
             </div>
         </div>
-    `).join('');
+        <div class="instance-actions">
+            ${getActionsTemplate(instance)}
+        </div>
+    `;
+}
+
+function bindCardActions(card, instance) {
+    const viewButton = card.querySelector('[data-action="view"]');
+    if (viewButton) {
+        viewButton.addEventListener('click', () => viewTunnel(instance.id, instance.name, instance.local_port));
+    }
+
+    const disconnectButton = card.querySelector('[data-action="disconnect"]');
+    if (disconnectButton) {
+        disconnectButton.addEventListener('click', () => disconnectInstance(instance.id));
+    }
+
+    const connectButton = card.querySelector('[data-action="connect"]');
+    if (connectButton && !connectButton.disabled) {
+        connectButton.addEventListener('click', () => connectInstance(instance.id));
+    }
+}
+
+function getActionsTemplate(instance) {
+    if (instance.status === 'online') {
+        return `
+            <button class="btn btn-view btn-small" data-action="view">View</button>
+            <button class="btn btn-danger btn-small" data-action="disconnect">Disconnect</button>
+        `;
+    }
+
+    const label = instance.status === 'offline' ? 'Offline' : 'Waiting for client...';
+
+    return `
+        <button class="btn btn-success btn-small" data-action="connect" disabled>${label}</button>
+    `;
 }
 
 async function connectInstance(instanceId) {

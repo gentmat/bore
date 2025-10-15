@@ -50,15 +50,17 @@ impl Client {
         secret: Option<&str>,
     ) -> Result<Self> {
         let mut stream = Delimited::new(connect_with_timeout(to, CONTROL_PORT).await?);
-        
+
         // Check if secret looks like an API key (starts with sk_)
         let is_api_key = secret.map(|s| s.starts_with("sk_")).unwrap_or(false);
-        
+
         let (api_key, auth) = if is_api_key {
             // New mode: Send API key directly for backend validation
             if let Some(key) = secret {
                 info!("Authenticating with API key");
-                stream.send(ClientMessage::Authenticate(key.to_string())).await?;
+                stream
+                    .send(ClientMessage::Authenticate(key.to_string()))
+                    .await?;
                 (Some(key.to_string()), None)
             } else {
                 (None, None)
@@ -76,7 +78,7 @@ impl Client {
 
         // Send Hello to request port
         stream.send(ClientMessage::Hello(port)).await?;
-        
+
         // Receive response
         let remote_port = match stream.recv_timeout().await? {
             Some(ServerMessage::Hello(remote_port)) => remote_port,
@@ -87,10 +89,10 @@ impl Client {
             Some(_) => bail!("unexpected initial non-hello message"),
             None => bail!("unexpected EOF"),
         };
-        
+
         info!(remote_port, "connected to server");
         info!("listening at {to}:{remote_port}");
-        
+
         // Only show public URL in legacy mode (when not using managed instances)
         // In managed mode, the start command handles the output
         if !is_api_key {
@@ -147,7 +149,7 @@ impl Client {
     async fn handle_connection(&self, id: Uuid) -> Result<()> {
         let mut remote_conn =
             Delimited::new(connect_with_timeout(&self.to[..], CONTROL_PORT).await?);
-        
+
         // Authenticate if using API key or legacy auth
         if self.api_key.is_some() {
             // New mode: Send API key (but server won't check it again for Accept messages)
@@ -156,7 +158,7 @@ impl Client {
             // Legacy mode: Do handshake
             auth.client_handshake(&mut remote_conn).await?;
         }
-        
+
         remote_conn.send(ClientMessage::Accept(id)).await?;
         let mut local_conn = connect_with_timeout(&self.local_host, self.local_port).await?;
         let mut parts = remote_conn.into_parts();

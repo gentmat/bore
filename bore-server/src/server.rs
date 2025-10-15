@@ -149,7 +149,7 @@ impl Server {
 
     async fn handle_connection(&self, stream: TcpStream) -> Result<()> {
         let mut stream = Delimited::new(stream);
-        
+
         // Authentication: Try backend API first, then fall back to legacy auth
         let user_id: String;
         let max_tunnels: u32;
@@ -157,7 +157,7 @@ impl Server {
 
         // First, expect either Authenticate (with API key), Hello (legacy), or Accept (forwarding)
         let first_msg = stream.recv_timeout().await?;
-        
+
         match first_msg {
             Some(ClientMessage::Accept(id)) => {
                 // This is a forwarding connection (client accepting an incoming connection)
@@ -176,39 +176,47 @@ impl Server {
             Some(ClientMessage::Authenticate(api_key)) => {
                 // Backend API authentication with individual user API keys
                 info!("Authenticating with backend API");
-                
+
                 let validation = match self.backend.validate_api_key(&api_key).await {
                     Ok(v) => v,
                     Err(err) => {
                         warn!(%err, "Failed to connect to backend API");
-                        stream.send(ServerMessage::Error(
-                            "Authentication service unavailable".to_string()
-                        )).await?;
+                        stream
+                            .send(ServerMessage::Error(
+                                "Authentication service unavailable".to_string(),
+                            ))
+                            .await?;
                         return Ok(());
                     }
                 };
 
                 if !validation.valid {
                     warn!("Invalid API key");
-                    stream.send(ServerMessage::Error(
-                        validation.message.unwrap_or_else(|| "Invalid API key".to_string())
-                    )).await?;
+                    stream
+                        .send(ServerMessage::Error(
+                            validation
+                                .message
+                                .unwrap_or_else(|| "Invalid API key".to_string()),
+                        ))
+                        .await?;
                     return Ok(());
                 }
 
                 if !validation.usage_allowed {
                     warn!("Usage not allowed for user");
                     stream.send(ServerMessage::Error(
-                        validation.message.unwrap_or_else(|| 
+                        validation.message.unwrap_or_else(||
                             "Subscription expired or usage limit exceeded. Please visit the dashboard.".to_string()
                         )
                     )).await?;
                     return Ok(());
                 }
 
-                user_id = validation.user_id.expect("user_id should be present for valid key");
+                user_id = validation
+                    .user_id
+                    .expect("user_id should be present for valid key");
                 max_tunnels = validation.max_concurrent_tunnels.unwrap_or(5);
-                
+
                 info!(
                     user_id = %user_id,
                     plan = ?validation.plan_type,
@@ -238,7 +246,9 @@ impl Server {
                     }
                     _ => {
                         warn!("Expected Hello message after authentication");
-                        stream.send(ServerMessage::Error("Protocol error".to_string())).await?;
+                        stream
+                            .send(ServerMessage::Error("Protocol error".to_string()))
+                            .await?;
                         return Ok(());
                     }
                 }
@@ -253,22 +263,29 @@ impl Server {
                         return Ok(());
                     }
                 }
-                
+
                 user_id = "legacy-user".to_string();
                 max_tunnels = 999; // No limit in legacy mode
                 requested_port = port;
-                
+
                 info!("Using legacy authentication mode");
             }
             _ => {
                 warn!("Unexpected initial message");
-                stream.send(ServerMessage::Error("Expected authentication or hello".to_string())).await?;
+                stream
+                    .send(ServerMessage::Error(
+                        "Expected authentication or hello".to_string(),
+                    ))
+                    .await?;
                 return Ok(());
             }
         }
 
         // Create listener for the requested port
-        match self.handle_tunnel_session(stream, user_id, requested_port, max_tunnels).await {
+        match self
+            .handle_tunnel_session(stream, user_id, requested_port, max_tunnels)
+            .await
+        {
             Ok(_) => Ok(()),
             Err(err) => {
                 warn!(%err, "Tunnel session error");
@@ -292,10 +309,10 @@ impl Server {
                 return Ok(());
             }
         };
-        
+
         let _host = listener.local_addr()?.ip();
         let public_port = listener.local_addr()?.port();
-        
+
         info!(
             user_id = %user_id,
             public_port = public_port,
@@ -309,12 +326,11 @@ impl Server {
             .or_insert(1);
 
         // Log tunnel start with backend
-        let session_id = match self.backend.log_tunnel_start(
-            &user_id,
-            public_port,
-            requested_port,
-            &self.server_id,
-        ).await {
+        let session_id = match self
+            .backend
+            .log_tunnel_start(&user_id, public_port, requested_port, &self.server_id)
+            .await
+        {
             Ok(id) => id,
             Err(err) => {
                 warn!(%err, "Failed to log tunnel start");
@@ -326,7 +342,9 @@ impl Server {
         stream.send(ServerMessage::Hello(public_port)).await?;
 
         // Main tunnel loop
-        let result = self.run_tunnel_loop(&mut stream, public_port, listener).await;
+        let result = self
+            .run_tunnel_loop(&mut stream, public_port, listener)
+            .await;
 
         // Cleanup: decrement tunnel count
         if let Some(mut count) = self.user_tunnels.get_mut(&user_id) {
@@ -363,7 +381,7 @@ impl Server {
                 // Assume that the TCP connection has been dropped.
                 return Ok(());
             }
-            
+
             const TIMEOUT: Duration = Duration::from_millis(500);
             if let Ok(result) = timeout(TIMEOUT, listener.accept()).await {
                 let (stream2, addr) = result?;

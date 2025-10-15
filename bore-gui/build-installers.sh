@@ -130,7 +130,11 @@ if [ $? -eq 0 ]; then
     echo "📦 Installers created:"
     echo ""
     
-    # Create release directory
+    # Kill any running instances to avoid "Text file busy" errors
+    killall bore-tunnel 2>/dev/null || true
+    
+    # Clean and create release directory
+    rm -rf release
     mkdir -p release
     
     # Detect platform and copy files

@@ -1,8 +1,9 @@
 use crate::state::{
     delete_credentials, load_credentials, save_credentials, AppState, Credentials, TunnelInstance,
-    TunnelStatus,
+    TunnelHandleSet, TunnelStatus,
 };
 use crate::tunnel_manager::{start_tunnel_connection, TunnelConfig};
+use bore_client::api_client::ConnectionInfo;
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
@@ -10,8 +11,10 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
+    sync::Arc,
 };
 use tauri::{AppHandle, Manager, State};
+use tokio::sync::{oneshot, Mutex};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
@@ -29,6 +32,7 @@ pub struct TunnelInstanceResponse {
     pub region: String,
     pub server_address: String,
     pub public_url: Option<String>,
+    pub remote_port: Option<u16>,
     pub status: String,
     pub error_message: Option<String>,
 }
@@ -41,6 +45,68 @@ pub struct DependencyStatus {
     pub code_server_installed: bool,
     pub code_server_installed_now: bool,
     pub code_server_error: Option<String>,
+}
+
+async fn send_disconnect_request(token: &str, instance_id: &str) -> Result<(), reqwest::Error> {
+    let client = reqwest::Client::new();
+    client
+        .post(format!(
+            "http://127.0.0.1:3000/api/user/instances/{}/disconnect",
+            instance_id
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
+}
+
+async fn update_instance_connection(
+    token: &str,
+    instance_id: &str,
+    status: Option<&str>,
+    remote_port: Option<u16>,
+    public_url: Option<&str>,
+) -> Result<(), reqwest::Error> {
+    let client = reqwest::Client::new();
+    let mut payload = serde_json::Map::new();
+
+    if let Some(status) = status {
+        payload.insert(
+            "status".to_string(),
+            serde_json::Value::String(status.to_string()),
+        );
+    }
+
+    if let Some(port) = remote_port {
+        let port_value = serde_json::Value::Number(serde_json::Number::from(port as u64));
+        payload.insert("remotePort".to_string(), port_value.clone());
+        payload.insert("remote_port".to_string(), port_value);
+    }
+
+    if let Some(url) = public_url {
+        payload.insert(
+            "publicUrl".to_string(),
+            serde_json::Value::String(url.to_string()),
+        );
+        payload.insert(
+            "public_url".to_string(),
+            serde_json::Value::String(url.to_string()),
+        );
+    }
+
+    client
+        .patch(format!(
+            "http://127.0.0.1:3000/api/user/instances/{}/connection",
+            instance_id
+        ))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&payload)
+        .send()
+        .await?
+        .error_for_status()?;
+
+    Ok(())
 }
 
 fn locate_bundled_bore_client(app_handle: &AppHandle) -> Option<PathBuf> {
@@ -315,10 +381,50 @@ pub async fn login(
 
 #[tauri::command]
 pub async fn logout(state: State<'_, AppState>) -> Result<bool, String> {
+    // Capture auth token before clearing credentials
+    let token = {
+        let creds = state.credentials.read().await;
+        creds.as_ref().map(|c| c.token.clone())
+    };
+
     // Stop all tunnels
     let mut handles = state.tunnel_handles.write().await;
-    for (_, handle) in handles.drain() {
-        handle.abort();
+    let handle_entries: Vec<(String, TunnelHandleSet)> = handles.drain().collect();
+    drop(handles);
+
+    let instance_ids: Vec<String> = handle_entries.iter().map(|(id, _)| id.clone()).collect();
+
+    for (instance_id, handle_set) in handle_entries {
+        tracing::info!("Stopping tunnel during logout: {}", instance_id);
+        if let Some(shutdown) = handle_set.heartbeat_shutdown {
+            if let Some(sender) = shutdown.lock().await.take() {
+                let _ = sender.send(());
+            }
+        }
+        handle_set.tunnel.abort();
+        if let Some(heartbeat) = handle_set.heartbeat {
+            heartbeat.abort();
+        }
+    }
+
+    // Remove tunnel metadata
+    let mut tunnels = state.tunnels.write().await;
+    for id in &instance_ids {
+        tunnels.remove(id);
+    }
+    drop(tunnels);
+
+    // Notify backend instances
+    if let Some(token) = token {
+        for id in &instance_ids {
+            if let Err(err) = send_disconnect_request(&token, id).await {
+                tracing::warn!(
+                    "Failed to disconnect instance {} during logout: {}",
+                    id,
+                    err
+                );
+            }
+        }
     }
 
     // Clear credentials
@@ -387,6 +493,11 @@ pub async fn list_instances(
             .unwrap_or("inactive");
 
         let error_message = tunnels.get(&id).and_then(|t| t.error_message.clone());
+        let remote_port = tunnels
+            .get(&id)
+            .and_then(|t| t.remote_port)
+            .or_else(|| instance["remotePort"].as_u64().map(|v| v as u16))
+            .or_else(|| instance["remote_port"].as_u64().map(|v| v as u16));
 
         result.push(TunnelInstanceResponse {
             id: id.clone(),
@@ -395,6 +506,7 @@ pub async fn list_instances(
             region: instance["region"].as_str().unwrap_or("").to_string(),
             server_address: instance["serverAddress"].as_str().unwrap_or("").to_string(),
             public_url: instance["publicUrl"].as_str().map(|s| s.to_string()),
+            remote_port,
             status: status.to_string(),
             error_message,
         });
@@ -428,16 +540,48 @@ pub async fn start_tunnel(
         return Err("Instance not found".to_string());
     }
 
-    let json: serde_json::Value = response
+    let instance_json: serde_json::Value = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    let local_port = json["localPort"].as_u64().ok_or("Invalid local port")? as u16;
-    let server_address = json["serverAddress"]
+    let instance_name = instance_json["name"]
         .as_str()
-        .ok_or("Invalid server address")?
+        .unwrap_or("")
         .to_string();
+    let instance_region = instance_json["region"]
+        .as_str()
+        .unwrap_or("local")
+        .to_string();
+
+    // Request connection information (token, server host, etc.)
+    let connect_response = client
+        .post(format!(
+            "http://127.0.0.1:3000/api/user/instances/{}/connect",
+            instance_id
+        ))
+        .header("Authorization", format!("Bearer {}", creds.token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to request connection: {}", e))?;
+
+    if !connect_response.status().is_success() {
+        let error_text = connect_response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to start tunnel".to_string());
+        return Err(error_text);
+    }
+
+    let connection_info: ConnectionInfo = connect_response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse connection info: {}", e))?;
+
+    let local_port = connection_info.local_port;
+    let server_host = connection_info.server_host.clone();
+    let requested_remote_port = connection_info.remote_port;
+    let tunnel_token = connection_info.tunnel_token.clone();
 
     // Update tunnel status to Starting
     let mut tunnels = state.tunnels.write().await;
@@ -445,11 +589,12 @@ pub async fn start_tunnel(
         instance_id.clone(),
         TunnelInstance {
             id: instance_id.clone(),
-            name: json["name"].as_str().unwrap_or("").to_string(),
+            name: instance_name.clone(),
             local_port,
-            region: json["region"].as_str().unwrap_or("").to_string(),
-            server_address: server_address.clone(),
-            public_url: json["publicUrl"].as_str().map(|s| s.to_string()),
+            region: instance_region.clone(),
+            server_address: server_host.clone(),
+            public_url: None,
+            remote_port: None,
             status: TunnelStatus::Starting,
             error_message: None,
         },
@@ -459,52 +604,142 @@ pub async fn start_tunnel(
     // Emit status update event
     let _ = app_handle.emit_all("tunnel-status-changed", &instance_id);
 
+    if let Err(err) = update_instance_connection(
+        &creds.token,
+        &instance_id,
+        Some("starting"),
+        None,
+        None,
+    )
+    .await
+    {
+        tracing::debug!(
+            "Failed to update backend connection state to starting for {}: {}",
+            instance_id,
+            err
+        );
+    }
+
+    // Prepare heartbeat shutdown signal
+    let (heartbeat_shutdown_sender, mut heartbeat_shutdown_rx) = oneshot::channel();
+    let heartbeat_shutdown_signal = Arc::new(Mutex::new(Some(heartbeat_shutdown_sender)));
+
+    // Start heartbeat loop for the instance
+    let heartbeat_instance_id = instance_id.clone();
+    let heartbeat_url = format!(
+        "http://127.0.0.1:3000/api/instances/{}/heartbeat",
+        heartbeat_instance_id
+    );
+    let heartbeat_auth_header = format!("Bearer {}", creds.token.clone());
+    let heartbeat_handle = tokio::spawn(async move {
+        let client = reqwest::Client::new();
+        let mut interval =
+            tokio::time::interval(tokio::time::Duration::from_secs(10));
+        loop {
+            tokio::select! {
+                _ = &mut heartbeat_shutdown_rx => {
+                    tracing::debug!("Heartbeat loop shutting down for {}", heartbeat_instance_id);
+                    break;
+                }
+                _ = interval.tick() => {
+                    if let Err(err) = client
+                        .post(&heartbeat_url)
+                        .header("Authorization", heartbeat_auth_header.clone())
+                        .send()
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to send heartbeat for {}: {}",
+                            heartbeat_instance_id,
+                            err
+                        );
+                    } else {
+                        tracing::debug!("Heartbeat sent for {}", heartbeat_instance_id);
+                    }
+                }
+            }
+        }
+    });
+
+    // Setup signal to update UI/backend once tunnel is ready
+    let (ready_tx, ready_rx) = oneshot::channel();
+    let ready_state = state.inner().clone();
+    let ready_instance_id = instance_id.clone();
+    let ready_app_handle = app_handle.clone();
+    let ready_token = creds.token.clone();
+    let ready_server_host = server_host.clone();
+    tokio::spawn(async move {
+        match ready_rx.await {
+            Ok(actual_port) => {
+                let public_url = format!("{}:{}", ready_server_host, actual_port);
+                {
+                    let mut tunnels = ready_state.tunnels.write().await;
+                    if let Some(tunnel) = tunnels.get_mut(&ready_instance_id) {
+                        tunnel.status = TunnelStatus::Active;
+                        tunnel.public_url = Some(public_url.clone());
+                        tunnel.remote_port = Some(actual_port);
+                        tunnel.error_message = None;
+                    }
+                }
+                let _ = ready_app_handle.emit_all("tunnel-status-changed", &ready_instance_id);
+
+                if let Err(err) = update_instance_connection(
+                    &ready_token,
+                    &ready_instance_id,
+                    Some("active"),
+                    Some(actual_port),
+                    Some(&public_url),
+                )
+                .await
+                {
+                    tracing::warn!(
+                        "Failed to update backend connection state for {}: {}",
+                        ready_instance_id,
+                        err
+                    );
+                }
+            }
+            Err(_) => {
+                tracing::debug!(
+                    "Tunnel ready signal dropped before completion for {}",
+                    ready_instance_id
+                );
+            }
+        }
+    });
+
     // Start tunnel in background
     let config = TunnelConfig {
         instance_id: instance_id.clone(),
+        local_host: "127.0.0.1".to_string(),
         local_port,
-        server_address,
-        secret: creds.token.clone(),
+        server_host: server_host.clone(),
+        remote_port: requested_remote_port,
+        secret: Some(tunnel_token),
+        ready_tx: Some(ready_tx),
     };
 
     let state_clone = state.inner().clone();
     let app_handle_clone = app_handle.clone();
     let instance_id_clone = instance_id.clone();
     let token_clone = creds.token.clone();
+    let heartbeat_shutdown_clone = Arc::clone(&heartbeat_shutdown_signal);
 
     let handle = tokio::spawn(async move {
-        // Start heartbeat task
-        let instance_id_heartbeat = instance_id_clone.clone();
-        let token_heartbeat = token_clone.clone();
-        tokio::spawn(async move {
-            let client = reqwest::Client::new();
-            loop {
-                // Send heartbeat every 10 seconds
-                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-
-                let _ = client
-                    .post(format!(
-                        "http://127.0.0.1:3000/api/instances/{}/heartbeat",
-                        instance_id_heartbeat
-                    ))
-                    .header("Authorization", format!("Bearer {}", token_heartbeat))
-                    .send()
-                    .await;
-            }
-        });
-
-        match start_tunnel_connection(config).await {
+        let result = start_tunnel_connection(config).await;
+        match &result {
             Ok(_) => {
-                // Update status to active
                 let mut tunnels = state_clone.tunnels.write().await;
                 if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
-                    tunnel.status = TunnelStatus::Active;
+                    tunnel.status = TunnelStatus::Inactive;
                     tunnel.error_message = None;
+                    tunnel.public_url = None;
+                    tunnel.remote_port = None;
                 }
                 drop(tunnels);
-                // Emit status update event
-                let _ = app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
-                tracing::info!("Tunnel active for {}", instance_id_clone);
+                let _ =
+                    app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
+                tracing::info!("Tunnel ended gracefully for {}", instance_id_clone);
             }
             Err(e) => {
                 let error_msg = format!("{}", e);
@@ -513,16 +748,43 @@ pub async fn start_tunnel(
                 if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
                     tunnel.status = TunnelStatus::Error;
                     tunnel.error_message = Some(error_msg);
+                    tunnel.public_url = None;
+                    tunnel.remote_port = None;
                 }
                 drop(tunnels);
-                // Emit status update event
-                let _ = app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
+                let _ =
+                    app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
             }
+        }
+
+        // Stop heartbeat loop gracefully
+        if let Some(sender) = heartbeat_shutdown_clone.lock().await.take() {
+            if sender.send(()).is_err() {
+                tracing::debug!(
+                    "Heartbeat loop already stopped for {}",
+                    instance_id_clone
+                );
+            }
+        }
+
+        if let Err(err) = send_disconnect_request(&token_clone, &instance_id_clone).await {
+            tracing::warn!(
+                "Failed to disconnect instance {} after tunnel ended: {}",
+                instance_id_clone,
+                err
+            );
         }
     });
 
     let mut handles = state.tunnel_handles.write().await;
-    handles.insert(instance_id, handle);
+    handles.insert(
+        instance_id,
+        TunnelHandleSet {
+            tunnel: handle,
+            heartbeat: Some(heartbeat_handle),
+            heartbeat_shutdown: Some(heartbeat_shutdown_signal),
+        },
+    );
 
     Ok(true)
 }
@@ -537,8 +799,16 @@ pub async fn stop_tunnel(
 
     // Stop the tunnel task
     let mut handles = state.tunnel_handles.write().await;
-    if let Some(handle) = handles.remove(&instance_id) {
-        handle.abort();
+    if let Some(handle_set) = handles.remove(&instance_id) {
+        if let Some(shutdown) = handle_set.heartbeat_shutdown {
+            if let Some(sender) = shutdown.lock().await.take() {
+                let _ = sender.send(());
+            }
+        }
+        handle_set.tunnel.abort();
+        if let Some(heartbeat) = handle_set.heartbeat {
+            heartbeat.abort();
+        }
         tracing::info!("Aborted tunnel task for {}", instance_id);
     }
     drop(handles);
@@ -547,6 +817,29 @@ pub async fn stop_tunnel(
     let mut tunnels = state.tunnels.write().await;
     tunnels.remove(&instance_id);
     drop(tunnels);
+
+    // Notify backend that the instance is offline
+    let token = {
+        let creds_guard = state.credentials.read().await;
+        creds_guard.as_ref().map(|c| c.token.clone())
+    };
+
+    if let Some(token) = token {
+        if let Err(err) = send_disconnect_request(&token, &instance_id).await {
+            tracing::warn!(
+                "Failed to disconnect instance {} during stop: {}",
+                instance_id,
+                err
+            );
+        } else {
+            tracing::info!("Disconnected instance {} from backend", instance_id);
+        }
+    } else {
+        tracing::debug!(
+            "No credentials available to disconnect instance {} during stop",
+            instance_id
+        );
+    }
 
     // Emit status update event
     let _ = app_handle.emit_all("tunnel-status-changed", &instance_id);
@@ -994,95 +1287,10 @@ pub async fn start_code_server_instance(
     tracing::info!("Auto-starting tunnel for code-server on port {}...", port);
 
     // Get server address from the created instance
-    let server_address = json["serverAddress"]
-        .as_str()
-        .unwrap_or("127.0.0.1:7835")
-        .to_string();
-
-    // Update tunnel status to Starting
-    let mut tunnels = state.tunnels.write().await;
-    tunnels.insert(
-        instance_id.clone(),
-        TunnelInstance {
-            id: instance_id.clone(),
-            name: instance_name.clone(),
-            local_port: port,
-            region: "local".to_string(),
-            server_address: server_address.clone(),
-            public_url: json["publicUrl"].as_str().map(|s| s.to_string()),
-            status: TunnelStatus::Starting,
-            error_message: None,
-        },
-    );
-    drop(tunnels);
-
-    // Emit status update event
-    let _ = app_handle.emit_all("tunnel-status-changed", &instance_id);
-
-    // Auto-start tunnel in background
-    let config = TunnelConfig {
-        instance_id: instance_id.clone(),
-        local_port: port,
-        server_address,
-        secret: creds.token.clone(),
-    };
-
-    let state_clone = state.inner().clone();
-    let app_handle_clone = app_handle.clone();
-    let instance_id_clone = instance_id.clone();
-    let token_clone = creds.token.clone();
-
-    let handle = tokio::spawn(async move {
-        // Start heartbeat task
-        let instance_id_heartbeat = instance_id_clone.clone();
-        let token_heartbeat = token_clone.clone();
-        tokio::spawn(async move {
-            let client = reqwest::Client::new();
-            loop {
-                // Send heartbeat every 10 seconds
-                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-
-                let _ = client
-                    .post(format!(
-                        "http://127.0.0.1:3000/api/instances/{}/heartbeat",
-                        instance_id_heartbeat
-                    ))
-                    .header("Authorization", format!("Bearer {}", token_heartbeat))
-                    .send()
-                    .await;
-            }
-        });
-
-        match start_tunnel_connection(config).await {
-            Ok(_) => {
-                // Update status to active
-                let mut tunnels = state_clone.tunnels.write().await;
-                if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
-                    tunnel.status = TunnelStatus::Active;
-                    tunnel.error_message = None;
-                }
-                drop(tunnels);
-                // Emit status update event
-                let _ = app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
-                tracing::info!("Tunnel auto-started and active for {}", instance_id_clone);
-            }
-            Err(e) => {
-                let error_msg = format!("{}", e);
-                tracing::error!("Auto-start tunnel error for {}: {}", instance_id_clone, error_msg);
-                let mut tunnels = state_clone.tunnels.write().await;
-                if let Some(tunnel) = tunnels.get_mut(&instance_id_clone) {
-                    tunnel.status = TunnelStatus::Error;
-                    tunnel.error_message = Some(error_msg);
-                }
-                drop(tunnels);
-                // Emit status update event
-                let _ = app_handle_clone.emit_all("tunnel-status-changed", &instance_id_clone);
-            }
-        }
-    });
-
-    let mut handles = state.tunnel_handles.write().await;
-    handles.insert(instance_id.clone(), handle);
+    // Reuse the standard start_tunnel flow
+    start_tunnel(app_handle.clone(), state.clone(), instance_id.clone())
+        .await
+        .map_err(|e| format!("Failed to auto-start tunnel: {}", e))?;
 
     Ok(instance_id)
 }

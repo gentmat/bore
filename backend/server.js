@@ -9,6 +9,8 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+const BORE_SERVER_HOST = process.env.BORE_SERVER_HOST || '127.0.0.1';
+const BORE_SERVER_PORT = parseInt(process.env.BORE_SERVER_PORT || '7835', 10);
 
 // Middleware
 app.use(cors());
@@ -163,10 +165,13 @@ app.post('/api/instances', authenticateJWT, (req, res) => {
     local_port: localPort, // Support both camelCase and snake_case
     region: region || 'local',
     server_region: region || 'local',
-    serverAddress: '127.0.0.1',
+    serverAddress: `${BORE_SERVER_HOST}:${BORE_SERVER_PORT}`,
+    server_host: BORE_SERVER_HOST,
     status: 'inactive',
     publicUrl: null,
-    public_url: null
+    public_url: null,
+    remotePort: null,
+    remote_port: null
   };
   
   instances.push(newInstance);
@@ -232,19 +237,21 @@ app.post('/api/user/instances/:id/connect', authenticateJWT, (req, res) => {
   
   const tunnel_token = 'temp_token_' + Math.random().toString(36).substring(7);
   const remote_port = 0; // Let bore server assign port automatically
-  
-  // Use actual bore server address (from environment or default to localhost)
-  const boreServerHost = process.env.BORE_SERVER_HOST || '127.0.0.1';
-  
-  // Mark as online and update heartbeat
-  instance.status = 'online';
+
+  // Reset instance connection metadata until the client reports readiness
+  instance.status = 'starting';
+  instance.public_url = null;
+  instance.publicUrl = null;
+  instance.remote_port = null;
+  instance.remotePort = null;
+  instance.serverAddress = `${BORE_SERVER_HOST}:${BORE_SERVER_PORT}`;
+  instance.server_host = BORE_SERVER_HOST;
   instanceHeartbeats.set(instance.id, Date.now());
-  instance.public_url = `${boreServerHost}:${remote_port || 'auto'}`;
   
   res.json({
     instance_id: instance.id,
     tunnel_token,
-    server_host: boreServerHost,
+    server_host: BORE_SERVER_HOST,
     local_port: instance.local_port,
     remote_port,
     ttl: 3600
@@ -260,8 +267,42 @@ app.post('/api/user/instances/:id/disconnect', authenticateJWT, (req, res) => {
   
   instance.status = 'offline';
   instance.public_url = null;
+  instance.publicUrl = null;
+  instance.remote_port = null;
+  instance.remotePort = null;
   instanceHeartbeats.delete(instance.id);
   
+  res.json({ success: true, instance });
+});
+
+app.patch('/api/user/instances/:id/connection', authenticateJWT, (req, res) => {
+  const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
+
+  if (!instance) {
+    return res.status(404).json({ error: 'instance_not_found', message: 'Instance not found' });
+  }
+
+  const { status, publicUrl, public_url, remotePort, remote_port } = req.body;
+
+  if (typeof status === 'string') {
+    instance.status = status;
+    if (status === 'active') {
+      instanceHeartbeats.set(instance.id, Date.now());
+    }
+  }
+
+  if (publicUrl !== undefined || public_url !== undefined) {
+    const urlValue = publicUrl ?? public_url;
+    instance.publicUrl = urlValue;
+    instance.public_url = urlValue;
+  }
+
+  if (remotePort !== undefined || remote_port !== undefined) {
+    const portValue = remotePort ?? remote_port;
+    instance.remotePort = portValue;
+    instance.remote_port = portValue;
+  }
+
   res.json({ success: true, instance });
 });
 

@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::{
+    sync::{oneshot, Mutex, RwLock},
+    task::JoinHandle,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
@@ -18,6 +21,7 @@ pub struct TunnelInstance {
     pub region: String,
     pub server_address: String,
     pub public_url: Option<String>,
+    pub remote_port: Option<u16>,
     pub status: TunnelStatus,
     pub error_message: Option<String>,
 }
@@ -35,13 +39,19 @@ pub enum TunnelStatus {
 pub struct AppState {
     pub credentials: Arc<RwLock<Option<Credentials>>>,
     pub tunnels: Arc<RwLock<HashMap<String, TunnelInstance>>>,
-    pub tunnel_handles: Arc<RwLock<HashMap<String, tokio::task::JoinHandle<()>>>>,
+    pub tunnel_handles: Arc<RwLock<HashMap<String, TunnelHandleSet>>>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self::default()
     }
+}
+
+pub struct TunnelHandleSet {
+    pub tunnel: JoinHandle<()>,
+    pub heartbeat: Option<JoinHandle<()>>,
+    pub heartbeat_shutdown: Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
 }
 
 pub fn get_credentials_path() -> std::path::PathBuf {

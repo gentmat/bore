@@ -39,8 +39,8 @@ impl Credentials {
         let path = Self::credentials_path()?;
         let content = fs::read_to_string(&path)
             .context("credentials file not found. Please run 'bore login' first")?;
-        let creds: Credentials = serde_json::from_str(&content)
-            .context("failed to parse credentials file")?;
+        let creds: Credentials =
+            serde_json::from_str(&content).context("failed to parse credentials file")?;
         Ok(creds)
     }
 
@@ -49,7 +49,7 @@ impl Credentials {
         let path = Self::credentials_path()?;
         let content = serde_json::to_string_pretty(self)?;
         fs::write(&path, content).context("failed to write credentials file")?;
-        
+
         // Set file permissions to 600 (owner read/write only) on Unix
         #[cfg(unix)]
         {
@@ -58,7 +58,7 @@ impl Credentials {
             perms.set_mode(0o600);
             fs::set_permissions(&path, perms)?;
         }
-        
+
         Ok(())
     }
 

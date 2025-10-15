@@ -123,6 +123,8 @@ cd bore-gui
 ```
 - ✅ **All-in-one script** - Does everything automatically
 - ✅ Checks prerequisites (Node.js, Rust, system deps)
+- ✅ Auto-kills running instances (prevents "Text file busy" errors)
+- ✅ Cleans previous builds
 - ✅ Builds bore-client binary
 - ✅ Builds GUI application
 - ✅ Creates installers (AppImage/DEB/MSI/DMG)

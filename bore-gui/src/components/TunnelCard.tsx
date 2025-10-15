@@ -120,6 +120,14 @@ export default function TunnelCard({
           <span className="text-gray-500 w-24">Local Port:</span>
           <span className="text-gray-900 font-medium">{instance.local_port}</span>
         </div>
+        {instance.remote_port !== undefined && (
+          <div className="flex items-center text-sm">
+            <span className="text-gray-500 w-24">Remote Port:</span>
+            <span className="text-gray-900 font-medium">
+              {instance.remote_port ?? "Assigning..."}
+            </span>
+          </div>
+        )}
         <div className="flex items-center text-sm">
           <span className="text-gray-500 w-24">Region:</span>
           <span className="text-gray-900 font-medium">{instance.region}</span>
