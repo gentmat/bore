@@ -27,6 +27,10 @@ struct Args {
     #[clap(long, env = "BORE_BACKEND_URL")]
     backend_url: Option<String>,
 
+    /// Internal API key for backend status updates.
+    #[clap(long, env = "BORE_BACKEND_API_KEY", hide_env_values = true)]
+    backend_api_key: Option<String>,
+
     /// Server ID for multi-server deployments (used in usage tracking).
     #[clap(long, env = "BORE_SERVER_ID", default_value = "default")]
     server_id: String,
@@ -52,6 +56,7 @@ async fn run(args: Args) -> Result<()> {
         port_range,
         args.secret.as_deref(),
         args.backend_url,
+        args.backend_api_key,
         args.server_id,
     );
     server.set_bind_addr(args.bind_addr);

@@ -36,7 +36,7 @@ After claiming, you'll see connection instructions!
 4. Copy the command shown
 5. Run it in your terminal:
    ```bash
-   bore 8080 --to us-east-1.tunnels.example.com --secret temp_token_xyz
+   bore 8080 --to us-east-1.tunnels.example.com --secret sk_tok_abcd1234
    ```
 
 #### Option B: With Stored Credentials (Future)
@@ -71,7 +71,7 @@ User Signs Up → Claims Plan → Goes to Dashboard → Clicks Connect
                                                           ↓
 Backend generates temporary token ← Dashboard requests connection
                                                           ↓
-User runs: bore 8080 --secret temp_token_xyz ← Gets command with token
+User runs: bore 8080 --secret sk_tok_abcd1234 ← Gets command with token
 ```
 
 ### Future Flow (CLI with Credentials):
@@ -112,10 +112,10 @@ See: "my-first-tunnel" (inactive)
 # Step 4: Connect tunnel
 Click: "Connect" button
 Copy command shown:
-bore 8080 --to us-east-1.tunnels.example.com --secret temp_token_abc123
+bore 8080 --to us-east-1.tunnels.example.com --secret sk_tok_abcd1234
 
 # Step 5: Run in terminal
-$ bore 8080 --to us-east-1.tunnels.example.com --secret temp_token_abc123
+$ bore 8080 --to us-east-1.tunnels.example.com --secret sk_tok_abcd1234
 ✓ Connected!
 ✓ Public URL: us-east-1.tunnels.example.com:15234
 

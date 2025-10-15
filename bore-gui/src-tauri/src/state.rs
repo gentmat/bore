@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::process::Child;
 use std::sync::Arc;
 use tokio::{
     sync::{oneshot, Mutex, RwLock},
@@ -32,7 +33,17 @@ pub enum TunnelStatus {
     Inactive,
     Starting,
     Active,
+    Online,
+    Degraded,
+    Idle,
+    Offline,
     Error,
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeServerInfo {
+    pub port: u16,
+    pub project_path: Option<String>,
 }
 
 #[derive(Default, Clone)]
@@ -40,6 +51,8 @@ pub struct AppState {
     pub credentials: Arc<RwLock<Option<Credentials>>>,
     pub tunnels: Arc<RwLock<HashMap<String, TunnelInstance>>>,
     pub tunnel_handles: Arc<RwLock<HashMap<String, TunnelHandleSet>>>,
+    pub code_server_processes: Arc<Mutex<HashMap<String, Child>>>,
+    pub code_server_metadata: Arc<RwLock<HashMap<String, CodeServerInfo>>>,
 }
 
 impl AppState {
@@ -52,6 +65,7 @@ pub struct TunnelHandleSet {
     pub tunnel: JoinHandle<()>,
     pub heartbeat: Option<JoinHandle<()>>,
     pub heartbeat_shutdown: Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
+    pub tunnel_shutdown: Option<Arc<Mutex<Option<oneshot::Sender<()>>>>>,
 }
 
 pub fn get_credentials_path() -> std::path::PathBuf {

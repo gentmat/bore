@@ -5,7 +5,13 @@ mod commands;
 mod state;
 mod tunnel_manager;
 
-use commands::*;
+use commands::{
+    check_auth, check_bore_client_installed, check_code_server_installed, create_instance,
+    delete_instance, ensure_dependencies, find_available_port_command, get_tunnel_status,
+    install_bore_client, install_code_server, list_instances, login, logout, rename_instance,
+    signup, start_code_server_instance, start_status_listener, start_tunnel, stop_status_listener,
+    stop_tunnel,
+};
 use state::{AppState, TunnelHandleSet};
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
@@ -66,6 +72,8 @@ fn main() {
             find_available_port_command,
             ensure_dependencies,
             start_code_server_instance,
+            start_status_listener,
+            stop_status_listener,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -117,15 +125,38 @@ fn cleanup_tunnels(app_handle: &tauri::AppHandle) {
 
             for (instance_id, handle_set) in handle_entries {
                 tracing::info!("Stopping tunnel for instance: {}", instance_id);
-                handle_set.tunnel.abort();
-                if let Some(heartbeat) = handle_set.heartbeat {
-                    heartbeat.abort();
+                
+                // Send graceful shutdown signals
+                if let Some(shutdown) = handle_set.tunnel_shutdown {
+                    if let Some(sender) = shutdown.lock().await.take() {
+                        let _ = sender.send(());
+                    }
+                }
+                if let Some(shutdown) = handle_set.heartbeat_shutdown {
+                    if let Some(sender) = shutdown.lock().await.take() {
+                        let _ = sender.send(());
+                    }
                 }
             }
+            
+            // Wait briefly for graceful shutdown
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
             let mut tunnels = state.tunnels.write().await;
             tunnels.clear();
             drop(tunnels);
+
+            // Kill all code-server processes
+            let mut processes = state.code_server_processes.lock().await;
+            for (instance_id, mut child) in processes.drain() {
+                tracing::info!("Killing code-server process during cleanup for instance: {}", instance_id);
+                if let Err(e) = child.kill() {
+                    tracing::warn!("Failed to kill code-server process for {}: {}", instance_id, e);
+                } else {
+                    let _ = child.wait();
+                }
+            }
+            drop(processes);
 
             for instance_id in &instance_ids {
                 let _ = app_handle.emit_all("tunnel-status-changed", instance_id);

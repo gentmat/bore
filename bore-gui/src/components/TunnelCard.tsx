@@ -21,7 +21,7 @@ export default function TunnelCard({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(instance.name);
 
-  const isActive = instance.status === "active";
+  const isActive = instance.status === "active" || instance.status === "online";
   const isStarting = instance.status === "starting";
 
   const handleCopyUrl = () => {
@@ -44,19 +44,60 @@ export default function TunnelCard({
     setIsEditing(false);
   };
 
-  const statusColor = {
-    active: "bg-green-100 text-green-800 border-green-200",
-    starting: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    error: "bg-red-100 text-red-800 border-red-200",
-    inactive: "bg-gray-100 text-gray-800 border-gray-200",
-  }[instance.status] || "bg-gray-100 text-gray-800 border-gray-200";
+  const statusConfig: Record<string, { color: string; dot: string; icon: string; message: string }> = {
+    active: { 
+      color: "bg-green-100 text-green-800 border-green-200", 
+      dot: "bg-green-500",
+      icon: "🟢",
+      message: "Ready for development"
+    },
+    online: { 
+      color: "bg-green-100 text-green-800 border-green-200", 
+      dot: "bg-green-500",
+      icon: "🟢",
+      message: "Ready for development"
+    },
+    starting: { 
+      color: "bg-yellow-100 text-yellow-800 border-yellow-200", 
+      dot: "bg-yellow-500 animate-pulse",
+      icon: "🟡",
+      message: "Connecting..."
+    },
+    degraded: { 
+      color: "bg-orange-100 text-orange-800 border-orange-200", 
+      dot: "bg-orange-500",
+      icon: "🟠",
+      message: "Connected but VSCode not responding"
+    },
+    idle: { 
+      color: "bg-blue-100 text-blue-800 border-blue-200", 
+      dot: "bg-blue-500",
+      icon: "🔵",
+      message: "Sleeping - click to wake"
+    },
+    offline: { 
+      color: "bg-gray-100 text-gray-800 border-gray-200", 
+      dot: "bg-gray-400",
+      icon: "🔴",
+      message: "Tunnel disconnected"
+    },
+    error: { 
+      color: "bg-red-100 text-red-800 border-red-200", 
+      dot: "bg-red-500",
+      icon: "🔴",
+      message: "Error occurred"
+    },
+    inactive: { 
+      color: "bg-gray-100 text-gray-800 border-gray-200", 
+      dot: "bg-gray-400",
+      icon: "⚪",
+      message: "Not connected"
+    },
+  };
 
-  const statusDot = {
-    active: "bg-green-500",
-    starting: "bg-yellow-500 animate-pulse",
-    error: "bg-red-500",
-    inactive: "bg-gray-400",
-  }[instance.status] || "bg-gray-400";
+  const status = statusConfig[instance.status] || statusConfig.inactive;
+  const statusColor = status.color;
+  const statusDot = status.dot;
 
   return (
     <div className="card hover:shadow-md transition-shadow duration-200">
@@ -105,11 +146,12 @@ export default function TunnelCard({
               </button>
             </div>
           )}
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col space-y-1">
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
               <span className={`w-2 h-2 rounded-full mr-1.5 ${statusDot}`}></span>
               {instance.status.charAt(0).toUpperCase() + instance.status.slice(1)}
             </span>
+            <span className="text-xs text-gray-600">{status.message}</span>
           </div>
         </div>
       </div>

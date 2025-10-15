@@ -60,7 +60,7 @@ bore 8080 --to 127.0.0.1
    **Option A: Via Dashboard**
    - Dashboard calls `/api/user/instances/{id}/connect`
    - Backend generates temporary tunnel token
-   - User runs command with token: `bore 8080 --to server.com --secret temp_token_xyz`
+   - User runs command with token: `bore 8080 --to server.com --secret sk_tok_abcd1234`
 
    **Option B: Via CLI (Future)**
    - CLI reads stored credentials from `~/.bore/credentials`
@@ -106,10 +106,10 @@ Status: 24-hour trial activated
 Sees: "my-first-tunnel" instance (inactive)
 
 # 4. User clicks "Connect"
-Gets command: bore 8080 --to us-east-1.tunnels.example.com --secret temp_token_abc123
+Gets command: bore 8080 --to us-east-1.tunnels.example.com --secret sk_tok_abcd1234
 
 # 5. User runs command
-$ bore 8080 --to us-east-1.tunnels.example.com --secret temp_token_abc123
+$ bore 8080 --to us-east-1.tunnels.example.com --secret sk_tok_abcd1234
 ✓ Connected! Public URL: us-east-1.tunnels.example.com:15234
 
 # 6. Dashboard auto-refreshes

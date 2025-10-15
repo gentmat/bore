@@ -1,0 +1,196 @@
+/**
+ * Prometheus metrics collection for Grafana
+ * Exposes metrics in Prometheus text format
+ */
+
+// Metric storage
+const metrics = {
+  // Counters
+  tunnelConnectionsTotal: 0,
+  tunnelDisconnectionsTotal: 0,
+  heartbeatsTotal: 0,
+  sseConnectionsTotal: 0,
+  apiRequestsTotal: 0,
+  
+  // Gauges
+  activeTunnels: 0,
+  activeInstances: 0,
+  activeSseConnections: 0,
+  instancesByStatus: {
+    online: 0,
+    active: 0,
+    offline: 0,
+    degraded: 0,
+    idle: 0,
+    starting: 0,
+    error: 0,
+    inactive: 0,
+  },
+  
+  // Histograms (simplified - just track values)
+  heartbeatResponseTimes: [],
+  apiResponseTimes: [],
+};
+
+// Reset histograms periodically to prevent memory growth
+setInterval(() => {
+  if (metrics.heartbeatResponseTimes.length > 1000) {
+    metrics.heartbeatResponseTimes = metrics.heartbeatResponseTimes.slice(-100);
+  }
+  if (metrics.apiResponseTimes.length > 1000) {
+    metrics.apiResponseTimes = metrics.apiResponseTimes.slice(-100);
+  }
+}, 60000); // Every minute
+
+/**
+ * Increment a counter metric
+ */
+function incrementCounter(metricName, value = 1) {
+  if (metrics[metricName] !== undefined) {
+    metrics[metricName] += value;
+  }
+}
+
+/**
+ * Set a gauge metric
+ */
+function setGauge(metricName, value) {
+  if (metrics[metricName] !== undefined) {
+    metrics[metricName] = value;
+  }
+}
+
+/**
+ * Record histogram value
+ */
+function recordHistogram(metricName, value) {
+  if (metrics[metricName] && Array.isArray(metrics[metricName])) {
+    metrics[metricName].push(value);
+  }
+}
+
+/**
+ * Update instance status counts
+ */
+function updateInstanceStatusCounts(instances) {
+  // Reset counts
+  Object.keys(metrics.instancesByStatus).forEach(status => {
+    metrics.instancesByStatus[status] = 0;
+  });
+  
+  // Count instances by status
+  instances.forEach(instance => {
+    const status = instance.status || 'inactive';
+    if (metrics.instancesByStatus[status] !== undefined) {
+      metrics.instancesByStatus[status]++;
+    }
+  });
+  
+  metrics.activeInstances = instances.length;
+  metrics.activeTunnels = instances.filter(i => i.tunnel_connected).length;
+}
+
+/**
+ * Calculate percentile from histogram
+ */
+function calculatePercentile(values, percentile) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, index)];
+}
+
+/**
+ * Generate Prometheus metrics in text format
+ */
+function generatePrometheusMetrics() {
+  const lines = [];
+  
+  // HELP and TYPE definitions
+  lines.push('# HELP bore_tunnel_connections_total Total number of tunnel connections');
+  lines.push('# TYPE bore_tunnel_connections_total counter');
+  lines.push(`bore_tunnel_connections_total ${metrics.tunnelConnectionsTotal}`);
+  
+  lines.push('# HELP bore_tunnel_disconnections_total Total number of tunnel disconnections');
+  lines.push('# TYPE bore_tunnel_disconnections_total counter');
+  lines.push(`bore_tunnel_disconnections_total ${metrics.tunnelDisconnectionsTotal}`);
+  
+  lines.push('# HELP bore_heartbeats_total Total number of heartbeats received');
+  lines.push('# TYPE bore_heartbeats_total counter');
+  lines.push(`bore_heartbeats_total ${metrics.heartbeatsTotal}`);
+  
+  lines.push('# HELP bore_sse_connections_total Total number of SSE connections');
+  lines.push('# TYPE bore_sse_connections_total counter');
+  lines.push(`bore_sse_connections_total ${metrics.sseConnectionsTotal}`);
+  
+  lines.push('# HELP bore_api_requests_total Total number of API requests');
+  lines.push('# TYPE bore_api_requests_total counter');
+  lines.push(`bore_api_requests_total ${metrics.apiRequestsTotal}`);
+  
+  lines.push('# HELP bore_active_tunnels Number of currently active tunnels');
+  lines.push('# TYPE bore_active_tunnels gauge');
+  lines.push(`bore_active_tunnels ${metrics.activeTunnels}`);
+  
+  lines.push('# HELP bore_active_instances Number of currently active instances');
+  lines.push('# TYPE bore_active_instances gauge');
+  lines.push(`bore_active_instances ${metrics.activeInstances}`);
+  
+  lines.push('# HELP bore_active_sse_connections Number of active SSE connections');
+  lines.push('# TYPE bore_active_sse_connections gauge');
+  lines.push(`bore_active_sse_connections ${metrics.activeSseConnections}`);
+  
+  lines.push('# HELP bore_instances_by_status Number of instances by status');
+  lines.push('# TYPE bore_instances_by_status gauge');
+  Object.entries(metrics.instancesByStatus).forEach(([status, count]) => {
+    lines.push(`bore_instances_by_status{status="${status}"} ${count}`);
+  });
+  
+  // Heartbeat response time histogram
+  if (metrics.heartbeatResponseTimes.length > 0) {
+    lines.push('# HELP bore_heartbeat_response_time_seconds Heartbeat response time');
+    lines.push('# TYPE bore_heartbeat_response_time_seconds summary');
+    lines.push(`bore_heartbeat_response_time_seconds{quantile="0.5"} ${calculatePercentile(metrics.heartbeatResponseTimes, 50) / 1000}`);
+    lines.push(`bore_heartbeat_response_time_seconds{quantile="0.9"} ${calculatePercentile(metrics.heartbeatResponseTimes, 90) / 1000}`);
+    lines.push(`bore_heartbeat_response_time_seconds{quantile="0.99"} ${calculatePercentile(metrics.heartbeatResponseTimes, 99) / 1000}`);
+    lines.push(`bore_heartbeat_response_time_seconds_sum ${metrics.heartbeatResponseTimes.reduce((a, b) => a + b, 0) / 1000}`);
+    lines.push(`bore_heartbeat_response_time_seconds_count ${metrics.heartbeatResponseTimes.length}`);
+  }
+  
+  // API response time histogram
+  if (metrics.apiResponseTimes.length > 0) {
+    lines.push('# HELP bore_api_response_time_seconds API response time');
+    lines.push('# TYPE bore_api_response_time_seconds summary');
+    lines.push(`bore_api_response_time_seconds{quantile="0.5"} ${calculatePercentile(metrics.apiResponseTimes, 50) / 1000}`);
+    lines.push(`bore_api_response_time_seconds{quantile="0.9"} ${calculatePercentile(metrics.apiResponseTimes, 90) / 1000}`);
+    lines.push(`bore_api_response_time_seconds{quantile="0.99"} ${calculatePercentile(metrics.apiResponseTimes, 99) / 1000}`);
+    lines.push(`bore_api_response_time_seconds_sum ${metrics.apiResponseTimes.reduce((a, b) => a + b, 0) / 1000}`);
+    lines.push(`bore_api_response_time_seconds_count ${metrics.apiResponseTimes.length}`);
+  }
+  
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Middleware to track API request metrics
+ */
+function metricsMiddleware(req, res, next) {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    incrementCounter('apiRequestsTotal');
+    recordHistogram('apiResponseTimes', duration);
+  });
+  
+  next();
+}
+
+module.exports = {
+  metrics,
+  incrementCounter,
+  setGauge,
+  recordHistogram,
+  updateInstanceStatusCounts,
+  generatePrometheusMetrics,
+  metricsMiddleware,
+};

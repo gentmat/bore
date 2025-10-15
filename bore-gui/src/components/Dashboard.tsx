@@ -36,16 +36,24 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
 
   useEffect(() => {
     loadInstances();
-    const interval = setInterval(loadInstances, 5000); // Refresh every 5 seconds
     
-    // Listen for real-time tunnel status changes
+    // Start SSE listener for real-time backend updates
+    invoke("start_status_listener").catch((err) => {
+      console.error("Failed to start status listener:", err);
+    });
+    
+    // Listen for real-time tunnel status changes (from both SSE and local events)
     const unlisten = listen("tunnel-status-changed", () => {
       loadInstances();
     });
     
+    // Fallback polling every 30 seconds (reduced from 5s since SSE handles real-time)
+    const interval = setInterval(loadInstances, 30000);
+    
     return () => {
       clearInterval(interval);
       unlisten.then(f => f());
+      invoke("stop_status_listener").catch(() => {});
     };
   }, []);
 

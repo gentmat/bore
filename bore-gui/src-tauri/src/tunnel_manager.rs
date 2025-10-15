@@ -11,6 +11,7 @@ pub struct TunnelConfig {
     pub remote_port: u16,
     pub secret: Option<String>,
     pub ready_tx: Option<oneshot::Sender<u16>>,
+    pub shutdown_rx: Option<oneshot::Receiver<()>>,
 }
 
 pub async fn start_tunnel_connection(config: TunnelConfig) -> Result<()> {
@@ -32,6 +33,21 @@ pub async fn start_tunnel_connection(config: TunnelConfig) -> Result<()> {
         let _ = tx.send(client.remote_port());
     }
 
-    client.listen().await?;
+    // Run client with graceful shutdown support
+    if let Some(mut shutdown_rx) = config.shutdown_rx {
+        tokio::select! {
+            result = client.listen() => {
+                result?;
+            }
+            _ = &mut shutdown_rx => {
+                info!("Tunnel shutdown signal received for instance {}", config.instance_id);
+                // Graceful shutdown - just exit the select and drop the client
+            }
+        }
+    } else {
+        client.listen().await?;
+    }
+    
+    info!("Tunnel connection closed for instance {}", config.instance_id);
     Ok(())
 }

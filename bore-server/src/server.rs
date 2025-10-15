@@ -51,11 +51,12 @@ impl Server {
         port_range: RangeInclusive<u16>,
         secret: Option<&str>,
         backend_url: Option<String>,
+        backend_api_key: Option<String>,
         server_id: String,
     ) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
 
-        let backend = BackendClient::new(backend_url.clone());
+        let backend = BackendClient::new(backend_url.clone(), backend_api_key.clone());
 
         if backend_url.is_some() {
             info!("Backend API enabled - using individual user authentication");
@@ -154,6 +155,7 @@ impl Server {
         let user_id: String;
         let max_tunnels: u32;
         let requested_port: u16;
+        let mut instance_id: Option<String> = None;
 
         // First, expect either Authenticate (with API key), Hello (legacy), or Accept (forwarding)
         let first_msg = stream.recv_timeout().await?;
@@ -217,8 +219,11 @@ impl Server {
                     .expect("user_id should be present for valid key");
                 max_tunnels = validation.max_concurrent_tunnels.unwrap_or(5);
 
+                instance_id = validation.instance_id.clone();
+
                 info!(
                     user_id = %user_id,
+                    instance_id = ?instance_id,
                     plan = ?validation.plan_type,
                     "User authenticated successfully"
                 );
@@ -283,7 +288,7 @@ impl Server {
 
         // Create listener for the requested port
         match self
-            .handle_tunnel_session(stream, user_id, requested_port, max_tunnels)
+            .handle_tunnel_session(stream, user_id, instance_id, requested_port, max_tunnels)
             .await
         {
             Ok(_) => Ok(()),
@@ -298,6 +303,7 @@ impl Server {
         &self,
         mut stream: Delimited<TcpStream>,
         user_id: String,
+        instance_id: Option<String>,
         requested_port: u16,
         _max_tunnels: u32,
     ) -> Result<()> {
@@ -318,6 +324,23 @@ impl Server {
             public_port = public_port,
             "Tunnel session started"
         );
+
+        if let Some(instance_id) = instance_id.clone() {
+            let backend = Arc::clone(&self.backend);
+            tokio::spawn(async move {
+                if let Err(err) = backend
+                    .notify_tunnel_connected(&instance_id, Some(public_port), None)
+                    .await
+                {
+                    warn!(
+                        %err,
+                        instance_id = %instance_id,
+                        public_port = public_port,
+                        "Failed to notify backend of tunnel connection"
+                    );
+                }
+            });
+        }
 
         // Increment user's tunnel count
         self.user_tunnels
@@ -345,6 +368,19 @@ impl Server {
         let result = self
             .run_tunnel_loop(&mut stream, public_port, listener)
             .await;
+
+        if let Some(instance_id) = instance_id {
+            let backend = Arc::clone(&self.backend);
+            tokio::spawn(async move {
+                if let Err(err) = backend.notify_tunnel_disconnected(&instance_id).await {
+                    warn!(
+                        %err,
+                        instance_id = %instance_id,
+                        "Failed to notify backend of tunnel disconnect"
+                    );
+                }
+            });
+        }
 
         // Cleanup: decrement tunnel count
         if let Some(mut count) = self.user_tunnels.get_mut(&user_id) {
