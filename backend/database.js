@@ -72,9 +72,9 @@ async function initializeDatabase() {
         instance_id VARCHAR(50) REFERENCES instances(id) ON DELETE CASCADE,
         status VARCHAR(50) NOT NULL,
         reason TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_instance_timestamp (instance_id, timestamp DESC)
-      )
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_instance_timestamp ON status_history(instance_id, timestamp DESC)
     `);
     
     // Health metrics table
@@ -87,9 +87,9 @@ async function initializeDatabase() {
         memory_usage BIGINT,
         has_code_server BOOLEAN,
         last_activity BIGINT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_instance_latest (instance_id, timestamp DESC)
-      )
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_instance_latest ON health_metrics(instance_id, timestamp DESC)
     `);
     
     // Tunnel tokens table
@@ -110,9 +110,9 @@ async function initializeDatabase() {
         instance_id VARCHAR(50) REFERENCES instances(id) ON DELETE CASCADE,
         alert_type VARCHAR(50) NOT NULL,
         message TEXT NOT NULL,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_instance_sent (instance_id, sent_at DESC)
-      )
+        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_instance_sent ON alert_history(instance_id, sent_at DESC)
     `);
     
     // Bore servers table (for server registry)
@@ -140,9 +140,9 @@ async function initializeDatabase() {
         position INTEGER,
         status VARCHAR(50) DEFAULT 'waiting',
         notified_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_status_position (status, position)
-      )
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_status_position ON waitlist(status, position)
     `);
     
     await client.query('COMMIT');

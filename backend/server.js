@@ -7,6 +7,11 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config();
 
+// Security middleware
+const { schemas, validate } = require('./middleware/validation');
+const { authLimiter, apiLimiter, tunnelLimiter, createInstanceLimiter } = require('./middleware/rate-limiter');
+const { checkUserQuota, checkSystemCapacity } = require('./middleware/capacity-check');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
@@ -15,21 +20,22 @@ const BORE_SERVER_PORT = parseInt(process.env.BORE_SERVER_PORT || '7835', 10);
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || null;
 
 // Middleware
-app.use(cors());
+// CORS configuration - restrict origins in production
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // In-memory database (replace with real database in production)
-const users = [
-  {
-    id: 'user_demo',
-    email: 'demo@bore.com',
-    password_hash: bcrypt.hashSync('demo123', 10),
-    name: 'Demo User',
-    plan: 'trial',
-    plan_expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-  }
-];
+// NOTE: Hardcoded demo user removed for security
+// To create a demo user, use the signup endpoint or create a seed script
+const users = [];
 
 const userPlans = {}; // Store user plans
 
@@ -50,6 +56,10 @@ const tunnelTokens = new Map(); // token -> { instanceId, userId, expiresAt }
 
 // SSE clients for real-time status updates
 const sseClients = new Map(); // userId -> Set of response objects
+
+// Expose data structures for middleware (capacity checking)
+app.locals.users = users;
+app.locals.instances = instances;
 
 const requireInternalApiKey = (req, res, next) => {
   if (!INTERNAL_API_KEY) {
@@ -76,12 +86,26 @@ function broadcastStatusChange(userId, instanceId, status) {
   const data = JSON.stringify({ instanceId, status, timestamp: Date.now() });
   const message = `data: ${data}\n\n`;
   
+  // Track dead clients for cleanup
+  const deadClients = [];
+  
   for (const client of clients) {
     try {
       client.write(message);
     } catch (err) {
-      // Client disconnected, will be cleaned up
+      // Client disconnected - mark for removal
+      deadClients.push(client);
     }
+  }
+  
+  // Clean up dead clients to prevent memory leak
+  deadClients.forEach(client => {
+    clients.delete(client);
+  });
+  
+  // Remove user entry if no clients left
+  if (clients.size === 0) {
+    sseClients.delete(userId);
   }
 }
 
@@ -120,7 +144,7 @@ const authenticateJWT = (req, res, next) => {
 };
 
 // Routes
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', authLimiter, validate(schemas.signup), async (req, res) => {
   const { name, email, password } = req.body;
   
   // Check if user already exists
@@ -159,7 +183,7 @@ app.post('/api/auth/signup', async (req, res) => {
   res.json({ token, user_id: userId, name });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, validate(schemas.login), async (req, res) => {
   const { email, password } = req.body;
   
   const user = users.find(u => u.email === email);
@@ -201,7 +225,7 @@ app.get('/api/instances/:id', authenticateJWT, (req, res) => {
 });
 
 // Create new instance
-app.post('/api/instances', authenticateJWT, (req, res) => {
+app.post('/api/instances', authenticateJWT, createInstanceLimiter, validate(schemas.createInstance), (req, res) => {
   const { name, localPort, region } = req.body;
   const userId = req.user.user_id;
   
@@ -250,7 +274,7 @@ app.delete('/api/instances/:id', authenticateJWT, (req, res) => {
 });
 
 // Rename instance
-app.patch('/api/instances/:id', authenticateJWT, (req, res) => {
+app.patch('/api/instances/:id', authenticateJWT, validate(schemas.renameInstance), (req, res) => {
   const { name } = req.body;
   const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
   
@@ -311,7 +335,7 @@ function addStatusHistory(instanceId, status, reason) {
 }
 
 // Instance heartbeat endpoint - clients call this to indicate they're online
-app.post('/api/instances/:id/heartbeat', authenticateJWT, (req, res) => {
+app.post('/api/instances/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), (req, res) => {
   const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
   
   if (!instance) {
@@ -349,7 +373,7 @@ app.post('/api/instances/:id/heartbeat', authenticateJWT, (req, res) => {
   res.json({ success: true, status, reason });
 });
 
-app.post('/api/user/instances/:id/connect', authenticateJWT, (req, res) => {
+app.post('/api/user/instances/:id/connect', authenticateJWT, tunnelLimiter, checkSystemCapacity, checkUserQuota, (req, res) => {
   const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
   
   if (!instance) {
@@ -412,7 +436,7 @@ app.post('/api/user/instances/:id/disconnect', authenticateJWT, (req, res) => {
   res.json({ success: true, instance });
 });
 
-app.patch('/api/user/instances/:id/connection', authenticateJWT, (req, res) => {
+app.patch('/api/user/instances/:id/connection', authenticateJWT, validate(schemas.connectionUpdate), (req, res) => {
   const instance = instances.find(i => i.id === req.params.id && i.user_id === req.user.user_id);
 
   if (!instance) {
@@ -576,7 +600,7 @@ app.post(
   }
 );
 
-app.post('/api/user/claim-plan', authenticateJWT, (req, res) => {
+app.post('/api/user/claim-plan', authenticateJWT, validate(schemas.claimPlan), (req, res) => {
   const { plan } = req.body;
   const userId = req.user.user_id;
 
