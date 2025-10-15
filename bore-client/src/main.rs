@@ -226,6 +226,8 @@ async fn handle_start(instance_name_or_id: String) -> Result<()> {
 
     println!("\n✓ Connected to \"{}\"", instance.name);
     println!("✓ Forwarding localhost:{}\n", connection_info.local_port);
+    println!("  Instance ID: {}", connection_info.instance_id);
+    println!("  Token TTL: {}s\n", connection_info.ttl);
     
     // Start heartbeat task to report online status
     let instance_id = instance.id.clone();
