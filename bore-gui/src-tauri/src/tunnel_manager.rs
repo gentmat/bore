@@ -32,11 +32,14 @@ pub async fn start_tunnel_connection(config: TunnelConfig) -> Result<()> {
     // Read response
     let mut response = Vec::new();
     let mut buf = [0u8; 1024];
-    
+
     match tokio::time::timeout(Duration::from_secs(10), stream.read(&mut buf)).await {
         Ok(Ok(n)) if n > 0 => {
             response.extend_from_slice(&buf[..n]);
-            info!("Received response: {:?}", String::from_utf8_lossy(&response));
+            info!(
+                "Received response: {:?}",
+                String::from_utf8_lossy(&response)
+            );
         }
         Ok(Ok(_)) => {
             return Err(anyhow!("Connection closed by server"));
@@ -66,7 +69,10 @@ pub async fn start_tunnel_connection(config: TunnelConfig) -> Result<()> {
         let mut local_stream = match TcpStream::connect(&local_addr).await {
             Ok(s) => s,
             Err(e) => {
-                error!("Failed to connect to local service at {}: {}", local_addr, e);
+                error!(
+                    "Failed to connect to local service at {}: {}",
+                    local_addr, e
+                );
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }

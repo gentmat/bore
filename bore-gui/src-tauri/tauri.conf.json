@@ -36,6 +36,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
+      "resources": ["resources/bore-client"],
       "category": "Utility",
       "shortDescription": "Tunnel Management Tool",
       "longDescription": "A simple and beautiful desktop application for managing bore tunnels. No command line required - just click and go!",

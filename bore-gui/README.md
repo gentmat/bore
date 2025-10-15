@@ -56,6 +56,14 @@ A beautiful, cross-platform desktop application for managing bore tunnels. Built
 
 ## Installation
 
+### Runtime Dependencies
+
+The Bore GUI application requires two dependencies to run:
+- **bore-client**: The tunnel client (automatically bundled with the app)
+- **code-server**: VS Code in the browser (automatically installed on first run)
+
+The app will **automatically install these dependencies** when you first launch it. If automatic installation fails, see [DEPENDENCY_SETUP.md](DEPENDENCY_SETUP.md) for manual installation instructions.
+
 ### From Source
 
 1. **Clone the repository**:
@@ -63,17 +71,22 @@ A beautiful, cross-platform desktop application for managing bore tunnels. Built
    cd bore/bore-gui
    ```
 
-2. **Install frontend dependencies**:
+2. **Prepare resources** (build bore-client and copy to resources):
+   ```bash
+   ./prepare-resources.sh
+   ```
+
+3. **Install frontend dependencies**:
    ```bash
    npm install
    ```
 
-3. **Run in development mode**:
+4. **Run in development mode**:
    ```bash
    npm run tauri dev
    ```
 
-4. **Build for production**:
+5. **Build for production**:
    ```bash
    npm run tauri build
    ```
@@ -202,6 +215,43 @@ bore-gui/
    - Call Tauri commands using `invoke()` from `@tauri-apps/api`
 
 ## Troubleshooting
+
+### Dependency Installation Failed
+
+If you see "Dependency setup failed" on startup:
+
+1. **Check PATH**: Ensure `~/.local/bin` is in your PATH:
+   ```bash
+   echo $PATH | grep ".local/bin"
+   ```
+
+2. **Add to PATH** if missing:
+   ```bash
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+3. **Manual installation**: See [DEPENDENCY_SETUP.md](DEPENDENCY_SETUP.md) for detailed instructions
+
+4. **Try again**: Restart the application after updating PATH
+
+### bore-client not found
+
+```bash
+# Build and install manually
+cd bore-client
+cargo build --release
+mkdir -p ~/.local/bin
+cp target/release/bore ~/.local/bin/bore-client
+chmod +x ~/.local/bin/bore-client
+```
+
+### code-server not found
+
+```bash
+# Install using official script
+curl -fsSL https://code-server.dev/install.sh | sh
+```
 
 ### Linux: App won't start
 

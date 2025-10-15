@@ -110,6 +110,11 @@ echo "🧹 Cleaning previous builds..."
 rm -rf src-tauri/target/release/bundle
 echo ""
 
+# Prepare bore-client binary
+echo "📦 Preparing bore-client binary..."
+bash prepare-build.sh
+echo ""
+
 # Build installers
 echo "🚀 Building installers (this may take a few minutes)..."
 echo ""

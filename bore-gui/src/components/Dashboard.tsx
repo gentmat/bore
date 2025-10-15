@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
+import { listen } from "@tauri-apps/api/event";
 import TunnelCard from "./TunnelCard";
 import CreateInstanceModal from "./CreateInstanceModal";
 import { Plus, RefreshCw, LogOut, User } from "lucide-react";
@@ -35,7 +36,16 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
   useEffect(() => {
     loadInstances();
     const interval = setInterval(loadInstances, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
+    
+    // Listen for real-time tunnel status changes
+    const unlisten = listen("tunnel-status-changed", () => {
+      loadInstances();
+    });
+    
+    return () => {
+      clearInterval(interval);
+      unlisten.then(f => f());
+    };
   }, []);
 
   const loadInstances = async () => {
@@ -66,26 +76,51 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
 
   const handleStartTunnel = async (instanceId: string) => {
     try {
+      // Optimistically update status to starting
+      setInstances(prev => prev.map(inst => 
+        inst.id === instanceId 
+          ? { ...inst, status: "starting", error_message: undefined }
+          : inst
+      ));
+      
       await invoke("start_tunnel", { instanceId });
-      await loadInstances();
+      // Event listener will handle the actual status update
     } catch (error) {
       console.error("Failed to start tunnel:", error);
       alert(`Failed to start tunnel: ${error}`);
+      // Reload on error to get correct state
+      await loadInstances();
     }
   };
 
   const handleStopTunnel = async (instanceId: string) => {
     try {
+      // Optimistically update status to inactive
+      setInstances(prev => prev.map(inst => 
+        inst.id === instanceId 
+          ? { ...inst, status: "inactive", error_message: undefined }
+          : inst
+      ));
+      
       await invoke("stop_tunnel", { instanceId });
-      await loadInstances();
+      // Event listener will handle the actual status update
     } catch (error) {
       console.error("Failed to stop tunnel:", error);
       alert(`Failed to stop tunnel: ${error}`);
+      // Reload on error to get correct state
+      await loadInstances();
     }
   };
 
   const handleDeleteInstance = async (instanceId: string) => {
-    if (!confirm("Are you sure you want to delete this instance?")) {
+    const instance = instances.find(i => i.id === instanceId);
+    const isActive = instance?.status === "active";
+    
+    const message = isActive
+      ? "This tunnel is currently active. It will be stopped and deleted. Are you sure?"
+      : "Are you sure you want to delete this instance?";
+    
+    if (!confirm(message)) {
       return;
     }
 
@@ -94,6 +129,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
       await loadInstances();
     } catch (error) {
       console.error("Failed to delete instance:", error);
+      alert(`Failed to delete instance: ${error}`);
     }
   };
 

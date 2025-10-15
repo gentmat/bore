@@ -45,8 +45,7 @@ impl AppState {
 }
 
 pub fn get_credentials_path() -> std::path::PathBuf {
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let config_dir = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     let bore_dir = config_dir.join("bore");
     std::fs::create_dir_all(&bore_dir).ok();
     bore_dir.join("credentials.json")
@@ -57,7 +56,7 @@ pub fn load_credentials() -> Option<Credentials> {
     if !path.exists() {
         return None;
     }
-    
+
     let content = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&content).ok()
 }

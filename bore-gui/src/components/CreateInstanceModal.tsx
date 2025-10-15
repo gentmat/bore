@@ -137,8 +137,11 @@ export default function CreateInstanceModal({
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
-              <strong>Auto-configured:</strong> Port will be automatically selected starting from 8081. 
-              Code-server and bore tunnel will start automatically.
+              <strong>Auto-start:</strong> Port will be automatically selected starting from 8081. 
+              Code-server and the bore tunnel will start automatically and connect.
+            </p>
+            <p className="text-xs text-blue-700 mt-2">
+              If bore-client or code-server are not installed, they will be automatically installed for you.
             </p>
           </div>
 

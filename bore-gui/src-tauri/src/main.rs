@@ -7,8 +7,8 @@ mod tunnel_manager;
 
 use commands::*;
 use state::AppState;
-use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
 use tauri::Manager;
+use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -20,7 +20,7 @@ fn main() {
         .add_item(show)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
-    
+
     let system_tray = SystemTray::new().with_menu(tray_menu);
 
     tauri::Builder::default()
@@ -57,9 +57,12 @@ fn main() {
             create_instance,
             delete_instance,
             rename_instance,
+            check_bore_client_installed,
+            install_bore_client,
             check_code_server_installed,
             install_code_server,
             find_available_port_command,
+            ensure_dependencies,
             start_code_server_instance,
         ])
         .run(tauri::generate_context!())

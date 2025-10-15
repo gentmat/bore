@@ -53,7 +53,7 @@ export default function TunnelCard({
 
   const statusDot = {
     active: "bg-green-500",
-    starting: "bg-yellow-500",
+    starting: "bg-yellow-500 animate-pulse",
     error: "bg-red-500",
     inactive: "bg-gray-400",
   }[instance.status] || "bg-gray-400";
@@ -189,9 +189,9 @@ export default function TunnelCard({
         
         <button
           onClick={onDelete}
-          disabled={isActive}
-          className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Delete instance"
+          disabled={isStarting}
+          className="px-4 py-2 bg-gray-50 hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isActive ? "Stop and delete instance" : "Delete instance"}
         >
           <Trash2 className="w-4 h-4" />
         </button>
