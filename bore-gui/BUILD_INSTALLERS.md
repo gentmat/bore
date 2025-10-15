@@ -38,6 +38,7 @@ source $HOME/.cargo/env
 ```bash
 sudo apt update
 sudo apt install -y libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+# Ubuntu 24.04+: this transitional package pulls in the libwebkit2gtk-4.1 libraries
 ```
 
 **Fedora:**
@@ -285,6 +286,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ### Linux: "webkit2gtk not found"
 ```bash
 sudo apt install libwebkit2gtk-4.0-dev
+# Ubuntu 24.04+: this transitional package pulls in the libwebkit2gtk-4.1 libraries
 ```
 
 ### macOS: "Xcode license not accepted"

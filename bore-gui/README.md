@@ -32,6 +32,7 @@ A beautiful, cross-platform desktop application for managing bore tunnels. Built
     libgtk-3-dev \
     libayatana-appindicator3-dev \
     librsvg2-dev
+  # Ubuntu 24.04+: this transitional package pulls in the libwebkit2gtk-4.1 libraries
   
   # Fedora
   sudo dnf install webkit2gtk3-devel \

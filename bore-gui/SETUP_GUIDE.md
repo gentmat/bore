@@ -54,6 +54,7 @@ sudo apt install -y \
   libgtk-3-dev \
   libayatana-appindicator3-dev \
   librsvg2-dev
+# Ubuntu 24.04+: the transitional package libwebkit2gtk-4.0-dev pulls in the 4.1 libraries
 ```
 
 **Fedora:**
@@ -347,6 +348,7 @@ Edit `src-tauri/tauri.conf.json`:
 **Error: webkit2gtk not found**
 ```bash
 sudo apt install libwebkit2gtk-4.0-dev
+# Ubuntu 24.04+: the transitional package libwebkit2gtk-4.0-dev provides the 4.1 libraries
 ```
 
 **Error: pkg-config not found**
@@ -437,6 +439,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y libwebkit2gtk-4.0-dev
+          # Ubuntu 24.04+: transitional package libwebkit2gtk-4.0-dev depends on the 4.1 libraries
       - name: Install frontend dependencies
         working-directory: bore-gui
         run: npm install

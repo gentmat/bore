@@ -8,6 +8,7 @@ Get up and running with the Bore Tunnel GUI in 5 minutes!
 ```bash
 sudo apt update
 sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+# Ubuntu 24.04+: this transitional package pulls in the libwebkit2gtk-4.1 libraries
 ```
 
 ### Linux (Fedora)
