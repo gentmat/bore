@@ -3,6 +3,8 @@
  * Provides consistent error formatting across all API endpoints
  */
 
+const { logger } = require('./logger');
+
 class ApiError extends Error {
   constructor(statusCode, errorCode, message, details = null) {
     super(message);
@@ -98,9 +100,7 @@ const ErrorResponses = {
  */
 function globalErrorHandler(err, req, res, next) {
   // Log error for debugging
-  console.error('Global Error Handler:', {
-    error: err.message,
-    stack: err.stack,
+  logger.error('Global Error Handler', err, {
     requestId: req.id,
     path: req.path,
     method: req.method

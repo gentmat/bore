@@ -5,16 +5,28 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:ts": "npm run build && node dist/server.js",
     "dev": "nodemon server.js",
+    "dev:ts": "ts-node server.ts",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:e2e": "jest --config tests/e2e/jest.config.js",
+    "test:unit": "jest --testPathIgnorePatterns=e2e --coverage",
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "seed:test": "node tests/fixtures/seed.js seed",
+    "seed:clear": "node tests/fixtures/seed.js clear",
+    "benchmark:migrations": "node scripts/benchmark-migrations.js",
+    "setup": "./scripts/setup-everything.sh",
     "build": "tsc",
+    "build:watch": "tsc --watch",
     "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
     "lint": "eslint . --ext .js,.ts",
-    "migrate": "node-pg-migrate",
-    "migrate:up": "node-pg-migrate up",
-    "migrate:down": "node-pg-migrate down",
-    "migrate:create": "node-pg-migrate create"
+    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "migrate": "node-pg-migrate -m migrations -c database.config.js",
+    "migrate:up": "node-pg-migrate up -m migrations -c database.config.js",
+    "migrate:down": "node-pg-migrate down -m migrations -c database.config.js",
+    "migrate:create": "node-pg-migrate create -m migrations -c database.config.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -35,6 +47,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/joi": "^17.2.3",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.10.0",
@@ -45,7 +58,10 @@
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3",
-    "typescript": "^5.3.3"
+    "swagger-ui-express": "^5.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "yamljs": "^0.3.0"
   },
   "jest": {
     "testEnvironment": "node",

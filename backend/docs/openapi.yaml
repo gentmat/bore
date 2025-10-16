@@ -1,0 +1,706 @@
+openapi: 3.0.3
+info:
+  title: Bore Tunnel Management API
+  description: |
+    REST API for managing TCP tunnels through bore-server infrastructure.
+    Provides user authentication, instance management, and real-time status monitoring.
+  version: 1.0.0
+  contact:
+    name: Bore Support
+    email: support@bore.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: https://api.bore.com/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: Instances
+    description: Tunnel instance management
+  - name: Admin
+    description: Administrative endpoints
+  - name: Monitoring
+    description: Health checks and metrics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: x-internal-api-key
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: user_1234567890_abc123
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: John Doe
+        plan:
+          type: string
+          enum: [trial, pro, enterprise]
+          example: pro
+        plan_expires:
+          type: string
+          format: date-time
+        is_admin:
+          type: boolean
+
+    Instance:
+      type: object
+      properties:
+        id:
+          type: string
+          example: inst_1234567890_xyz789
+        user_id:
+          type: string
+        name:
+          type: string
+          example: My Dev Environment
+        local_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          example: 3000
+        remote_port:
+          type: integer
+          nullable: true
+        region:
+          type: string
+          example: us-east
+        server_host:
+          type: string
+        assigned_server:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [inactive, starting, active, online, idle, degraded, offline]
+          example: online
+        status_reason:
+          type: string
+        tunnel_connected:
+          type: boolean
+        public_url:
+          type: string
+          nullable: true
+        current_tunnel_token:
+          type: string
+          nullable: true
+        tunnel_token_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TunnelToken:
+      type: object
+      properties:
+        tunnel_token:
+          type: string
+          example: a1b2c3d4e5f6...
+        bore_server_host:
+          type: string
+          example: bore-server-01.bore.com
+        bore_server_port:
+          type: integer
+          example: 7835
+        local_port:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        server_info:
+          type: object
+          properties:
+            server_id:
+              type: string
+            utilization:
+              type: string
+
+    HealthMetrics:
+      type: object
+      properties:
+        instance_id:
+          type: string
+        status:
+          type: string
+        status_reason:
+          type: string
+        tunnel_connected:
+          type: boolean
+        vscode_responsive:
+          type: boolean
+        cpu_usage:
+          type: number
+          format: float
+        memory_usage:
+          type: integer
+        has_code_server:
+          type: boolean
+        last_activity:
+          type: integer
+        last_heartbeat:
+          type: integer
+        heartbeat_age_ms:
+          type: integer
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Invalid input data
+        details:
+          type: object
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+paths:
+  # Authentication Endpoints
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: Create a new user account with trial plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  refreshToken:
+                    type: string
+                  refreshTokenExpiresAt:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  refreshToken:
+                    type: string
+                  refreshTokenExpiresAt:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Exchange refresh token for new access token (token rotation)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  refreshToken:
+                    type: string
+                  refreshTokenExpiresAt:
+                    type: string
+        '401':
+          description: Invalid refresh token
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout current session
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /auth/logout-all:
+    post:
+      tags:
+        - Authentication
+      summary: Logout from all devices
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out from all devices
+
+  /auth/claim-plan:
+    post:
+      tags:
+        - Authentication
+      summary: Claim or upgrade subscription plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan
+              properties:
+                plan:
+                  type: string
+                  enum: [trial, pro, enterprise]
+      responses:
+        '200':
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  plan:
+                    type: string
+                  expires_at:
+                    type: string
+
+  # Instance Management
+  /instances:
+    get:
+      tags:
+        - Instances
+      summary: List user instances
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Instance'
+
+    post:
+      tags:
+        - Instances
+      summary: Create new instance
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - localPort
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                localPort:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                region:
+                  type: string
+                server_host:
+                  type: string
+      responses:
+        '201':
+          description: Instance created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instance'
+        '429':
+          description: Quota exceeded
+        '503':
+          description: System at capacity
+
+  /instances/{id}:
+    patch:
+      tags:
+        - Instances
+      summary: Rename instance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Instance updated
+        '404':
+          description: Instance not found
+
+    delete:
+      tags:
+        - Instances
+      summary: Delete instance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Instance deleted
+        '404':
+          description: Instance not found
+
+  /instances/{id}/heartbeat:
+    post:
+      tags:
+        - Instances
+      summary: Send instance heartbeat
+      description: Update instance status with health metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vscode_responsive:
+                  type: boolean
+                last_activity:
+                  type: integer
+                cpu_usage:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                memory_usage:
+                  type: integer
+                has_code_server:
+                  type: boolean
+      responses:
+        '200':
+          description: Heartbeat recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  status:
+                    type: string
+                  reason:
+                    type: string
+
+  /instances/{id}/connect:
+    post:
+      tags:
+        - Instances
+      summary: Get tunnel connection token
+      description: Generate token for establishing tunnel connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tunnel token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TunnelToken'
+        '503':
+          description: All servers at capacity
+
+  /instances/{id}/disconnect:
+    post:
+      tags:
+        - Instances
+      summary: Disconnect tunnel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Disconnected successfully
+
+  /instances/{id}/health:
+    get:
+      tags:
+        - Instances
+      summary: Get instance health metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Health metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthMetrics'
+
+  /instances/{id}/status-history:
+    get:
+      tags:
+        - Instances
+      summary: Get instance status history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instance_id:
+                    type: string
+                  current_status:
+                    type: string
+                  status_reason:
+                    type: string
+                  health_metrics:
+                    type: object
+                  last_heartbeat:
+                    type: integer
+                  heartbeat_age_ms:
+                    type: integer
+                  status_history:
+                    type: array
+                    items:
+                      type: object
+                  uptime_data:
+                    type: object
+
+  # Monitoring
+  /health:
+    get:
+      tags:
+        - Monitoring
+      summary: Health check
+      description: Check API and dependency health
+      responses:
+        '200':
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  uptime:
+                    type: number
+                  timestamp:
+                    type: integer
+                  checks:
+                    type: object
+        '503':
+          description: System unhealthy
+
+  /metrics:
+    get:
+      tags:
+        - Monitoring
+      summary: Prometheus metrics
+      description: Export metrics in Prometheus format
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string

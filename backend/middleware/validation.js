@@ -1,8 +1,10 @@
 const Joi = require('joi');
+const { normalizeRequestBody } = require('../utils/naming-convention');
 
 /**
  * Validation Schemas
  * Comprehensive input validation for all API endpoints
+ * Accepts both camelCase and snake_case, normalizes to snake_case for database
  */
 const schemas = {
   // Auth schemas
@@ -31,7 +33,7 @@ const schemas = {
     password: Joi.string().required()
   }),
 
-  // Instance schemas
+  // Instance schemas - Accept both camelCase and snake_case
   createInstance: Joi.object({
     name: Joi.string().min(1).max(255).trim().required()
       .messages({
@@ -39,26 +41,40 @@ const schemas = {
         'string.max': 'Instance name cannot exceed 255 characters',
         'any.required': 'Instance name is required'
       }),
-    localPort: Joi.number().integer().min(1).max(65535).required()
+    // Accept both localPort and local_port
+    localPort: Joi.number().integer().min(1).max(65535).optional()
       .messages({
         'number.min': 'Port must be between 1 and 65535',
-        'number.max': 'Port must be between 1 and 65535',
-        'any.required': 'Local port is required'
+        'number.max': 'Port must be between 1 and 65535'
       }),
-    local_port: Joi.number().integer().min(1).max(65535).optional(), // Support both formats
+    local_port: Joi.number().integer().min(1).max(65535).optional(),
     region: Joi.string().max(100).trim().optional().default('local'),
+    // Accept both serverHost and server_host
+    serverHost: Joi.string().max(255).trim().optional(),
     server_host: Joi.string().max(255).trim().optional()
+  }).custom((value, helpers) => {
+    // Ensure at least one port field is provided
+    if (!value.localPort && !value.local_port) {
+      return helpers.error('any.required', { label: 'localPort or local_port' });
+    }
+    return value;
   }),
 
   renameInstance: Joi.object({
     name: Joi.string().min(1).max(255).trim().required()
   }),
 
+  // Accept both camelCase and snake_case for health metrics
   heartbeat: Joi.object({
+    vscodeResponsive: Joi.boolean().optional(),
     vscode_responsive: Joi.boolean().optional(),
+    lastActivity: Joi.number().optional(),
     last_activity: Joi.number().optional(),
+    cpuUsage: Joi.number().min(0).max(100).optional(),
     cpu_usage: Joi.number().min(0).max(100).optional(),
+    memoryUsage: Joi.number().min(0).optional(),
     memory_usage: Joi.number().min(0).optional(),
+    hasCodeServer: Joi.boolean().optional(),
     has_code_server: Joi.boolean().optional()
   }),
 
@@ -115,8 +131,15 @@ function validate(schema, source = 'body') {
       });
     }
 
-    // Replace original data with validated & sanitized data
-    req[source] = value;
+    // Normalize naming convention (both camelCase and snake_case accepted, normalized to snake_case)
+    const normalized = normalizeRequestBody(value);
+    
+    // Replace original data with validated, sanitized, and normalized data
+    req[source] = normalized;
+    
+    // Also keep original for API compatibility
+    req[`${source}Original`] = value;
+    
     next();
   };
 }

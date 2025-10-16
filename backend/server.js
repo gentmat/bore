@@ -1,3 +1,7 @@
+// Initialize tracing first (before any other imports)
+const { initializeTracing, shutdownTracing, traceContextMiddleware } = require('./tracing');
+const tracingProvider = initializeTracing('bore-backend');
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -57,6 +61,7 @@ const corsOptions = {
 
 // Middleware (order matters!)
 app.use(requestIdMiddleware); // Must be first to track all requests
+app.use(traceContextMiddleware); // Add trace context to requests
 app.use(httpLoggerMiddleware); // Log all HTTP requests
 app.use(cors(corsOptions));
 // Request size limits for security (prevent DOS attacks)
@@ -123,7 +128,7 @@ function broadcastMiddleware(req, res, next) {
       // From heartbeat
       const instance = res.locals.instance;
       if (instance) {
-        broadcastStatusChange(instance.user_id, instance.id, res.locals.newStatus);
+        broadcastStatusChange(instance.userId, instance.id, res.locals.newStatus);
       }
     }
     
@@ -215,6 +220,12 @@ app.get('/api/v1/events/status', authenticateJWT, (req, res) => {
   });
   res.on('finish', cleanup);
 });
+
+// API Documentation (Swagger) - MANDATORY
+const { swaggerUi, swaggerDocument, swaggerOptions } = require('./swagger');
+app.use('/api/v1/docs', swaggerUi.serve);
+app.get('/api/v1/docs', swaggerUi.setup(swaggerDocument, swaggerOptions));
+logger.info('📚 API Documentation available at /api/v1/docs');
 
 // Prometheus metrics endpoint
 app.get('/metrics', (req, res) => {
@@ -335,7 +346,7 @@ setInterval(async () => {
             status_reason: 'Heartbeat timeout'
           });
           await db.addStatusHistory(instance.id, 'offline', 'Heartbeat timeout');
-          broadcastStatusChange(instance.user_id, instance.id, 'offline');
+          broadcastStatusChange(instance.userId, instance.id, 'offline');
           
           // Send alert
           alerts.offline(instance.id, instance.name);
@@ -347,7 +358,7 @@ setInterval(async () => {
   }
 }, config.heartbeat.checkInterval);
 
-// Periodic cleanup of expired refresh tokens (every 6 hours)
+// Periodic cleanup of expired refresh tokens
 setInterval(async () => {
   try {
     const deletedCount = await cleanupExpiredTokens();
@@ -357,7 +368,7 @@ setInterval(async () => {
   } catch (error) {
     logger.error('Token cleanup error', error);
   }
-}, 6 * 60 * 60 * 1000); // 6 hours
+}, config.tokenCleanup.interval);
 
 // Initialize database, Redis, and start server
 async function startServer() {
@@ -424,6 +435,9 @@ async function gracefulShutdown(signal) {
     if (config.redis.enabled) {
       await redisService.shutdown();
     }
+    
+    // Shutdown tracing
+    await shutdownTracing(tracingProvider);
     
     logger.info('Server closed gracefully');
     process.exit(0);

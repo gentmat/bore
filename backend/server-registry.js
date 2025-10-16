@@ -8,6 +8,7 @@ const { db } = require('./database');
 const config = require('./config');
 const redisService = require('./services/redis-service');
 const { logger } = require('./utils/logger');
+const CircuitBreaker = require('./utils/circuit-breaker');
 
 // In-memory fallback (when Redis is disabled)
 const servers = new Map();
@@ -16,6 +17,15 @@ const servers = new Map();
 const REDIS_PREFIX = 'bore:server:';
 const REDIS_STATS_PREFIX = 'bore:server:stats:';
 const SERVER_TTL = 60; // Server registration TTL in seconds
+
+// Circuit breaker for Redis operations
+const redisCircuitBreaker = new CircuitBreaker({
+  name: 'redis-registry',
+  failureThreshold: 3,
+  successThreshold: 2,
+  timeout: 5000, // 5 seconds
+  resetTimeout: 30000 // 30 seconds
+});
 
 /**
  * Register a new bore-server instance
@@ -46,11 +56,13 @@ async function registerServer(serverInfo) {
   // Store in Redis if enabled (with TTL for auto-cleanup of dead servers)
   if (config.redis.enabled) {
     try {
-      await redisService.client.setex(
-        `${REDIS_PREFIX}${server.id}`,
-        SERVER_TTL,
-        JSON.stringify(server)
-      );
+      await redisCircuitBreaker.execute(async () => {
+        await redisService.client.setex(
+          `${REDIS_PREFIX}${server.id}`,
+          SERVER_TTL,
+          JSON.stringify(server)
+        );
+      });
       logger.info(`Registered server ${server.id} in Redis`);
     } catch (error) {
       logger.warn(`Failed to register server in Redis: ${error.message}`);
@@ -83,13 +95,15 @@ async function getActiveServers() {
   // Try Redis first for distributed deployments
   if (config.redis.enabled) {
     try {
-      const keys = await redisService.client.keys(`${REDIS_PREFIX}*`);
-      const serverPromises = keys.map(async (key) => {
-        const data = await redisService.client.get(key);
-        return data ? JSON.parse(data) : null;
+      const redisServers = await redisCircuitBreaker.execute(async () => {
+        const keys = await redisService.client.keys(`${REDIS_PREFIX}*`);
+        const serverPromises = keys.map(async (key) => {
+          const data = await redisService.client.get(key);
+          return data ? JSON.parse(data) : null;
+        });
+        return (await Promise.all(serverPromises))
+          .filter(s => s && s.status === 'active');
       });
-      const redisServers = (await Promise.all(serverPromises))
-        .filter(s => s && s.status === 'active');
       
       if (redisServers.length > 0) {
         return redisServers;
@@ -239,5 +253,6 @@ module.exports = {
   updateServerLoad,
   markServerUnhealthy,
   getFleetStats,
-  servers
+  servers,
+  getCircuitBreakerStats: () => redisCircuitBreaker.getStats()
 };

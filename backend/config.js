@@ -79,6 +79,11 @@ const config = {
     idleTimeout: 1800, // 30 minutes (in seconds)
   },
 
+  // Token Cleanup
+  tokenCleanup: {
+    interval: 6 * 60 * 60 * 1000, // 6 hours
+  },
+
   // Token Configuration
   tokens: {
     jwt: {

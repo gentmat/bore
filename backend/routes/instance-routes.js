@@ -56,13 +56,13 @@ router.get('/', authenticateJWT, async (req, res) => {
   try {
     const instances = await db.getInstancesByUserId(req.user.user_id);
     
-    // Add heartbeat age to each instance
+    // Add heartbeat age to each instance (using camelCase)
     const withHeartbeat = await Promise.all(instances.map(async (instance) => {
       const lastHeartbeat = await getHeartbeat(instance.id);
       return {
         ...instance,
-        last_heartbeat: lastHeartbeat,
-        heartbeat_age_ms: lastHeartbeat ? Date.now() - lastHeartbeat : null
+        lastHeartbeat: lastHeartbeat,
+        heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null
       };
     }));
     
@@ -75,12 +75,14 @@ router.get('/', authenticateJWT, async (req, res) => {
 
 // Create instance
 router.post('/', authenticateJWT, createInstanceLimiter, requireCapacity, validate(schemas.createInstance), async (req, res) => {
+  // req.body is now normalized to snake_case by validation middleware
   const { name, local_port, region, server_host } = req.body;
   const userId = req.user.user_id;
   
   try {
     const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Database layer expects snake_case and returns camelCase
     const instance = await db.createInstance({
       id: instanceId,
       user_id: userId,
@@ -91,6 +93,7 @@ router.post('/', authenticateJWT, createInstanceLimiter, requireCapacity, valida
       status: 'inactive'
     });
     
+    // Response is already in camelCase from db.createInstance
     res.status(201).json(instance);
   } catch (error) {
     logger.error('Create instance error', error);
@@ -103,7 +106,7 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -124,7 +127,7 @@ router.patch('/:id', authenticateJWT, validate(schemas.renameInstance), async (r
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -148,7 +151,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -156,7 +159,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
     await setHeartbeat(instance.id, Date.now());
     incrementCounter('heartbeatsTotal');
     
-    // Store health metrics
+    // Store health metrics (req.body is normalized to snake_case)
     const { vscode_responsive, last_activity, cpu_usage, memory_usage, has_code_server } = req.body || {};
     if (vscode_responsive !== undefined) {
       await db.saveHealthMetrics(instance.id, {
@@ -179,6 +182,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
       // Broadcast will be handled by caller (server.js)
       res.locals.statusChanged = true;
       res.locals.newStatus = status;
+      res.locals.instance = instance;
     }
     
     recordHistogram('heartbeatResponseTimes', Date.now() - startTime);
@@ -194,7 +198,7 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => 
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -206,9 +210,9 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => 
       return ErrorResponses.serviceUnavailable(res, 'All servers at capacity. Please try again later.', req.id);
     }
     
-    // Delete old token if exists
-    if (instance.current_tunnel_token) {
-      await db.deleteTunnelToken(instance.current_tunnel_token);
+    // Delete old token if exists (using camelCase field)
+    if (instance.currentTunnelToken) {
+      await db.deleteTunnelToken(instance.currentTunnelToken);
     }
     
     // Generate new tunnel token
@@ -223,13 +227,13 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => 
     });
     
     res.json({
-      tunnel_token: tunnelToken,
-      bore_server_host: bestServer.host,  // ← LOAD BALANCED!
-      bore_server_port: bestServer.port,
-      local_port: instance.local_port,
-      expires_at: expiresAt.toISOString(),
-      server_info: {
-        server_id: bestServer.id,
+      tunnelToken: tunnelToken,
+      boreServerHost: bestServer.host,
+      boreServerPort: bestServer.port,
+      localPort: instance.localPort,
+      expiresAt: expiresAt.toISOString(),
+      serverInfo: {
+        serverId: bestServer.id,
         utilization: bestServer.overallUtilization?.toFixed(1) + '%'
       }
     });
@@ -244,13 +248,13 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
-    // Delete tunnel token
-    if (instance.current_tunnel_token) {
-      await db.deleteTunnelToken(instance.current_tunnel_token);
+    // Delete tunnel token (using camelCase field)
+    if (instance.currentTunnelToken) {
+      await db.deleteTunnelToken(instance.currentTunnelToken);
     }
     
     // Update instance
@@ -263,7 +267,8 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
       tunnel_token_expires_at: null
     });
     
-    instanceHeartbeats.delete(instance.id);
+    // Clean up heartbeat (Redis-aware)
+    await deleteHeartbeat(instance.id);
     
     res.json({ success: true });
   } catch (error) {
@@ -277,7 +282,7 @@ router.get('/:id/status-history', authenticateJWT, async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -286,14 +291,14 @@ router.get('/:id/status-history', authenticateJWT, async (req, res) => {
     const lastHeartbeat = instanceHeartbeats.get(instance.id);
     
     res.json({
-      instance_id: instance.id,
-      current_status: instance.status,
-      status_reason: instance.status_reason,
-      health_metrics: healthMetrics || {},
-      last_heartbeat: lastHeartbeat,
-      heartbeat_age_ms: lastHeartbeat ? Date.now() - lastHeartbeat : null,
-      status_history: history,
-      uptime_data: calculateUptimeMetrics(history)
+      instanceId: instance.id,
+      currentStatus: instance.status,
+      statusReason: instance.statusReason,
+      healthMetrics: healthMetrics || {},
+      lastHeartbeat: lastHeartbeat,
+      heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
+      statusHistory: history,
+      uptimeData: calculateUptimeMetrics(history)
     });
   } catch (error) {
     logger.error('Status history error', error);
@@ -306,7 +311,7 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
-    if (!instance || instance.user_id !== req.user.user_id) {
+    if (!instance || instance.userId !== req.user.user_id) {
       return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
@@ -314,13 +319,13 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
     const lastHeartbeat = instanceHeartbeats.get(instance.id);
     
     res.json({
-      instance_id: instance.id,
+      instanceId: instance.id,
       status: instance.status,
-      status_reason: instance.status_reason,
-      tunnel_connected: instance.tunnel_connected,
+      statusReason: instance.statusReason,
+      tunnelConnected: instance.tunnelConnected,
       ...healthMetrics,
-      last_heartbeat: lastHeartbeat,
-      heartbeat_age_ms: lastHeartbeat ? Date.now() - lastHeartbeat : null
+      lastHeartbeat: lastHeartbeat,
+      heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null
     });
   } catch (error) {
     logger.error('Health metrics error', error);
@@ -330,7 +335,7 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
 
 /**
  * Helper: Determine instance status based on heartbeat and health metrics
- * @param {Object} instance - Instance object from database
+ * @param {Object} instance - Instance object from database (camelCase)
  * @returns {Promise<Object>} Object with status and reason
  */
 async function determineInstanceStatus(instance) {
@@ -338,7 +343,7 @@ async function determineInstanceStatus(instance) {
   const lastHeartbeat = instanceHeartbeats.get(instance.id);
   const healthMetrics = await db.getLatestHealthMetrics(instance.id) || {};
   
-  if (instance.tunnel_connected === false || instance.status === 'offline') {
+  if (instance.tunnelConnected === false || instance.status === 'offline') {
     return { status: 'offline', reason: 'Tunnel disconnected' };
   }
   
@@ -346,11 +351,11 @@ async function determineInstanceStatus(instance) {
     return { status: 'offline', reason: 'Heartbeat timeout' };
   }
   
-  if (healthMetrics.has_code_server && healthMetrics.vscode_responsive === false) {
+  if (healthMetrics.hasCodeServer && healthMetrics.vscodeResponsive === false) {
     return { status: 'degraded', reason: 'VSCode not responding' };
   }
   
-  if (healthMetrics.last_activity && (now / 1000 - healthMetrics.last_activity) > config.heartbeat.idleTimeout) {
+  if (healthMetrics.lastActivity && (now / 1000 - healthMetrics.lastActivity) > config.heartbeat.idleTimeout) {
     return { status: 'idle', reason: `No activity for ${config.heartbeat.idleTimeout / 60}+ minutes` };
   }
   
@@ -359,12 +364,12 @@ async function determineInstanceStatus(instance) {
 
 /**
  * Helper: Calculate uptime metrics from status history
- * @param {Array} history - Array of status history records
- * @returns {Object} Uptime statistics
+ * @param {Array} history - Array of status history records (camelCase)
+ * @returns {Object} Uptime statistics (camelCase)
  */
 function calculateUptimeMetrics(history) {
   if (!history || history.length === 0) {
-    return { uptime_percentage: 0, total_downtime_ms: 0, incident_count: 0 };
+    return { uptimePercentage: 0, totalDowntimeMs: 0, incidentCount: 0 };
   }
   
   let totalTime = 0;
@@ -392,10 +397,10 @@ function calculateUptimeMetrics(history) {
   const uptimePercentage = totalTime > 0 ? (uptimeMs / totalTime) * 100 : 0;
   
   return {
-    uptime_percentage: uptimePercentage.toFixed(2),
-    total_downtime_ms: totalTime - uptimeMs,
-    incident_count: incidentCount,
-    history_span_ms: totalTime
+    uptimePercentage: uptimePercentage.toFixed(2),
+    totalDowntimeMs: totalTime - uptimeMs,
+    incidentCount: incidentCount,
+    historySpanMs: totalTime
   };
 }
 

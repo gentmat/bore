@@ -48,14 +48,15 @@
     "types": ["node", "jest"]
   },
   "include": [
-    "**/*.ts",
-    "**/*.js"
+    "**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "coverage",
     "**/*.test.js",
-    "public"
+    "**/*.test.ts",
+    "public",
+    "**/*.js"
   ]
 }

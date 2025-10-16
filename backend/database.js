@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const config = require('./config');
 const { logger } = require('./utils/logger');
+const { formatDbRow, formatDbRows } = require('./utils/naming-convention');
 
 // Database configuration
 const pool = new Pool({
@@ -25,13 +26,30 @@ pool.on('error', (err) => {
 
 /**
  * Initialize database schema
- * Creates all required tables and indexes if they don't exist
+ * NOTE: For new deployments, use migrations instead (npm run migrate:up)
+ * This function is kept for backwards compatibility with existing deployments
  * @returns {Promise<void>}
  */
 async function initializeDatabase() {
   const client = await pool.connect();
   
   try {
+    // Check if migrations table exists
+    const migrationsExist = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'pgmigrations'
+      );
+    `);
+    
+    if (migrationsExist.rows[0].exists) {
+      logger.info('✅ Database uses migrations - skipping legacy schema initialization');
+      return;
+    }
+    
+    logger.warn('⚠️  Using legacy schema initialization. Consider migrating to proper migrations!');
+    logger.warn('⚠️  Run: npm run migrate:up');
+    
     await client.query('BEGIN');
     
     // Users table
@@ -194,12 +212,42 @@ async function initializeDatabase() {
  */
 const db = {
   /**
-   * Execute a direct SQL query
+   * Execute a direct SQL query with performance logging
    * @param {string} text - SQL query text
    * @param {Array} params - Query parameters
    * @returns {Promise<Object>} Query result
    */
-  query: (text, params) => pool.query(text, params),
+  async query(text, params) {
+    const start = Date.now();
+    try {
+      const result = await pool.query(text, params);
+      const duration = Date.now() - start;
+      
+      // Log slow queries (> 100ms)
+      if (duration > 100) {
+        logger.warn('Slow query detected', {
+          duration: `${duration}ms`,
+          query: text.substring(0, 100),
+          rowCount: result.rowCount
+        });
+      } else {
+        logger.debug('Query executed', {
+          duration: `${duration}ms`,
+          query: text.substring(0, 100),
+          rowCount: result.rowCount
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - start;
+      logger.error('Query failed', error, {
+        duration: `${duration}ms`,
+        query: text.substring(0, 100)
+      });
+      throw error;
+    }
+  },
   
   /**
    * Execute operations within a transaction
@@ -228,17 +276,17 @@ const db = {
       'INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4) RETURNING *',
       [id, email, passwordHash, name]
     );
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async getUserByEmail(email) {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async getUserById(id) {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async updateUserPlan(userId, plan, expiresAt) {
@@ -246,7 +294,7 @@ const db = {
       'UPDATE users SET plan = $1, plan_expires = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
       [plan, expiresAt, userId]
     );
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   // Instance operations
@@ -257,7 +305,7 @@ const db = {
       [instance.id, instance.user_id, instance.name, instance.local_port, 
        instance.region, instance.server_host, instance.status || 'inactive']
     );
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async getInstancesByUserId(userId) {
@@ -265,12 +313,12 @@ const db = {
       'SELECT * FROM instances WHERE user_id = $1 ORDER BY created_at DESC',
       [userId]
     );
-    return result.rows;
+    return formatDbRows(result.rows);
   },
   
   async getInstanceById(id) {
     const result = await pool.query('SELECT * FROM instances WHERE id = $1', [id]);
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async updateInstance(id, updates) {
@@ -280,7 +328,7 @@ const db = {
       `UPDATE instances SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
       values
     );
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async deleteInstance(id) {
@@ -289,7 +337,7 @@ const db = {
   
   async getAllInstances() {
     const result = await pool.query('SELECT * FROM instances ORDER BY created_at DESC');
-    return result.rows;
+    return formatDbRows(result.rows);
   },
   
   // Status history operations
@@ -305,7 +353,7 @@ const db = {
       'SELECT * FROM status_history WHERE instance_id = $1 ORDER BY timestamp DESC LIMIT $2',
       [instanceId, limit]
     );
-    return result.rows;
+    return formatDbRows(result.rows);
   },
   
   // Health metrics operations
@@ -323,7 +371,7 @@ const db = {
       'SELECT * FROM health_metrics WHERE instance_id = $1 ORDER BY timestamp DESC LIMIT 1',
       [instanceId]
     );
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   // Tunnel token operations
@@ -336,7 +384,7 @@ const db = {
   
   async getTunnelToken(token) {
     const result = await pool.query('SELECT * FROM tunnel_tokens WHERE token = $1', [token]);
-    return result.rows[0];
+    return formatDbRow(result.rows[0]);
   },
   
   async deleteTunnelToken(token) {
@@ -356,7 +404,7 @@ const db = {
       'SELECT * FROM alert_history WHERE instance_id = $1 ORDER BY sent_at DESC LIMIT $2',
       [instanceId, limit]
     );
-    return result.rows;
+    return formatDbRows(result.rows);
   },
 };
 
