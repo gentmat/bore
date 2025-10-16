@@ -5,6 +5,12 @@ const bodyParser = require('body-parser');
 const path = require('path');
 require('dotenv').config();
 
+// Import utilities
+const { logger } = require('./utils/logger');
+const { globalErrorHandler, notFoundHandler } = require('./utils/error-handler');
+const { requestIdMiddleware } = require('./middleware/request-id');
+const { httpLoggerMiddleware } = require('./middleware/http-logger');
+
 // Import modules
 const { db, initializeDatabase } = require('./database');
 const { authenticateJWT } = require('./auth-middleware');
@@ -22,12 +28,37 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // SSE clients tracking
 const sseClients = new Map(); // userId -> Set of response objects
 
-// Middleware
-app.use(cors());
+// CORS Configuration - Environment-based whitelist
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️  CORS: Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-internal-api-key']
+};
+
+// Middleware (order matters!)
+app.use(requestIdMiddleware); // Must be first to track all requests
+app.use(httpLoggerMiddleware); // Log all HTTP requests
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(metricsMiddleware); // Track all API requests
@@ -43,12 +74,24 @@ function broadcastStatusChange(userId, instanceId, status) {
     const data = JSON.stringify({ instanceId, status, timestamp: Date.now() });
     const message = `data: ${data}\n\n`;
     
+    const deadClients = [];
     for (const client of clients) {
       try {
         client.write(message);
       } catch (err) {
-        // Client disconnected
+        // Client disconnected - mark for removal
+        console.warn(`SSE write failed for user ${userId}, marking for cleanup`);
+        deadClients.push(client);
       }
+    }
+    
+    // Clean up dead clients
+    deadClients.forEach(client => {
+      clients.delete(client);
+    });
+    
+    if (clients.size === 0) {
+      sseClients.delete(userId);
     }
   }
   
@@ -103,13 +146,13 @@ app.get('/api/events/status', authenticateJWT, (req, res) => {
   }
   sseClients.get(userId).add(res);
   
-  console.log(`SSE client connected for user ${userId}`);
+  console.log(`✅ SSE client connected for user ${userId} (total: ${sseClients.get(userId).size})`);
   
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
   
-  // Cleanup on disconnect
-  req.on('close', () => {
+  // Cleanup function
+  const cleanup = () => {
     const clients = sseClients.get(userId);
     if (clients) {
       clients.delete(res);
@@ -117,8 +160,17 @@ app.get('/api/events/status', authenticateJWT, (req, res) => {
         sseClients.delete(userId);
       }
     }
-    console.log(`SSE client disconnected for user ${userId}`);
+    console.log(`🔌 SSE client disconnected for user ${userId} (remaining: ${clients ? clients.size : 0})`);
+  };
+  
+  // Handle all disconnect scenarios
+  req.on('close', cleanup);
+  req.on('end', cleanup);
+  res.on('error', (err) => {
+    console.warn(`⚠️  SSE error for user ${userId}:`, err.message);
+    cleanup();
   });
+  res.on('finish', cleanup);
 });
 
 // Prometheus metrics endpoint
@@ -170,6 +222,10 @@ app.get('/', (req, res) => {
   res.redirect('/signup');
 });
 
+// Error handlers (must be last!)
+app.use(notFoundHandler); // Handle 404 for undefined routes
+app.use(globalErrorHandler); // Handle all other errors
+
 // Periodic heartbeat timeout check
 setInterval(async () => {
   try {
@@ -195,7 +251,7 @@ setInterval(async () => {
       }
     }
   } catch (error) {
-    console.error('Heartbeat check error:', error);
+    logger.error('Heartbeat check error', error);
   }
 }, 5000); // Every 5 seconds
 
@@ -203,40 +259,45 @@ setInterval(async () => {
 initializeDatabase()
   .then(() => {
     server.listen(PORT, () => {
-      console.log('='.repeat(60));
-      console.log('🚀 Bore Backend Server');
-      console.log('='.repeat(60));
-      console.log(`📡 HTTP Server:      http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket Server: ws://localhost:${PORT}/socket.io/`);
-      console.log(`📊 Metrics:          http://localhost:${PORT}/metrics`);
-      console.log(`💚 Health Check:     http://localhost:${PORT}/health`);
-      console.log('='.repeat(60));
-      console.log(`📝 Sign Up:          http://localhost:${PORT}/signup`);
-      console.log(`📝 Login:            http://localhost:${PORT}/login`);
-      console.log(`📊 Dashboard:        http://localhost:${PORT}/dashboard`);
-      console.log('='.repeat(60));
-      console.log('✅ Server is ready!');
-      console.log('='.repeat(60));
+      logger.info('='.repeat(60));
+      logger.info('🚀 Bore Backend Server Started');
+      logger.info('='.repeat(60));
+      logger.info(`📡 HTTP Server:      http://localhost:${PORT}`);
+      logger.info(`🔌 WebSocket Server: ws://localhost:${PORT}/socket.io/`);
+      logger.info(`📊 Metrics:          http://localhost:${PORT}/metrics`);
+      logger.info(`💚 Health Check:     http://localhost:${PORT}/health`);
+      logger.info('='.repeat(60));
+      logger.info(`📝 Sign Up:          http://localhost:${PORT}/signup`);
+      logger.info(`📝 Login:            http://localhost:${PORT}/login`);
+      logger.info(`📊 Dashboard:        http://localhost:${PORT}/dashboard`);
+      logger.info('='.repeat(60));
+      logger.info('✅ Server is ready!', { 
+        port: PORT, 
+        env: NODE_ENV,
+        corsEnabled: true,
+        allowedOrigins: ALLOWED_ORIGINS 
+      });
+      logger.info('='.repeat(60));
     });
   })
   .catch(error => {
-    console.error('💥 Failed to initialize database:', error);
+    logger.error('💥 Failed to initialize database', error);
     process.exit(1);
   });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing server');
+  logger.info('SIGTERM signal received: closing server');
   server.close(() => {
-    console.log('Server closed');
+    logger.info('Server closed gracefully');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT signal received: closing server');
+  logger.info('SIGINT signal received: closing server');
   server.close(() => {
-    console.log('Server closed');
+    logger.info('Server closed gracefully');
     process.exit(0);
   });
 });

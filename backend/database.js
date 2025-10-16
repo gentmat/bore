@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { logger } = require('./utils/logger');
 
 // Database configuration
 const pool = new Pool({
@@ -14,11 +15,11 @@ const pool = new Pool({
 
 // Test database connection
 pool.on('connect', () => {
-  console.log('📦 Database connected successfully');
+  logger.info('📦 Database connected successfully');
 });
 
 pool.on('error', (err) => {
-  console.error('💥 Unexpected database error:', err);
+  logger.error('💥 Unexpected database error', err);
 });
 
 // Initialize database schema
@@ -146,10 +147,10 @@ async function initializeDatabase() {
     `);
     
     await client.query('COMMIT');
-    console.log('✅ Database schema initialized successfully');
+    logger.info('✅ Database schema initialized successfully');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('💥 Database initialization failed:', error);
+    logger.error('💥 Database initialization failed', error);
     throw error;
   } finally {
     client.release();
@@ -159,6 +160,22 @@ async function initializeDatabase() {
 // Database query helpers
 const db = {
   query: (text, params) => pool.query(text, params),
+  
+  // Transaction support
+  async transaction(callback) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await callback(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
   
   // User operations
   async createUser(id, email, passwordHash, name) {
