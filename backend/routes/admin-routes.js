@@ -3,8 +3,12 @@ const router = express.Router();
 const { db } = require('../database');
 const { requireAdminAuth } = require('../auth-middleware');
 const { instanceHeartbeats } = require('./instance-routes');
+const { ErrorResponses } = require('../utils/error-handler');
 
-// Get all instances with health metrics (admin only)
+/**
+ * Get all instances with health metrics (admin only)
+ * Returns comprehensive instance data with health metrics and heartbeat status
+ */
 router.get('/instances', requireAdminAuth, async (req, res) => {
   try {
     const allInstances = await db.getAllInstances();
@@ -26,14 +30,14 @@ router.get('/instances', requireAdminAuth, async (req, res) => {
     res.json({ instances: withMetrics, total: withMetrics.length });
   } catch (error) {
     console.error('Admin get instances error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get instances' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get instances', req.id);
   }
 });
 
-// Get system statistics (admin only)
+/**
+ * Get system statistics (admin only)
+ * Returns aggregate statistics about all instances and tunnel status
+ */
 router.get('/stats', requireAdminAuth, async (req, res) => {
   try {
     const allInstances = await db.getAllInstances();
@@ -57,14 +61,14 @@ router.get('/stats', requireAdminAuth, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Admin stats error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get stats' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get stats', req.id);
   }
 });
 
-// Get alert history for all instances (admin only)
+/**
+ * Get alert history for all instances (admin only)
+ * Returns recent alerts across all instances
+ */
 router.get('/alerts', requireAdminAuth, async (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   
@@ -77,14 +81,14 @@ router.get('/alerts', requireAdminAuth, async (req, res) => {
     res.json({ alerts: result.rows });
   } catch (error) {
     console.error('Admin alerts error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get alerts' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get alerts', req.id);
   }
 });
 
-// Make user admin (super admin only - in production, protect this better)
+/**
+ * Make user admin (super admin only - in production, protect this better)
+ * Grants admin privileges to a user
+ */
 router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
   try {
     await db.query(
@@ -95,10 +99,7 @@ router.post('/users/:id/make-admin', requireAdminAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Make admin error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to make user admin' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to make user admin', req.id);
   }
 });
 

@@ -1,21 +1,25 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
+const config = require('../config');
 const { db } = require('../database');
 const { generateToken, authenticateJWT } = require('../auth-middleware');
+const { schemas, validate } = require('../middleware/validation');
+const { authLimiter } = require('../middleware/rate-limiter');
+const { ErrorResponses } = require('../utils/error-handler');
 
-// Sign up
-router.post('/signup', async (req, res) => {
+/**
+ * Sign up new user
+ * Creates user account and assigns trial plan atomically
+ */
+router.post('/signup', authLimiter, validate(schemas.signup), async (req, res) => {
   const { name, email, password } = req.body;
   
   try {
     // Check if user already exists
     const existing = await db.getUserByEmail(email);
     if (existing) {
-      return res.status(400).json({ 
-        error: 'user_exists', 
-        message: 'Email already registered' 
-      });
+      return ErrorResponses.conflict(res, 'Email already registered', req.id);
     }
     
     // Hash password
@@ -25,11 +29,25 @@ router.post('/signup', async (req, res) => {
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Set plan expiry (24 hours from now for trial)
-    const planExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const planExpires = new Date(Date.now() + config.plans.trial.duration);
     
-    // Create user
-    const user = await db.createUser(userId, email, passwordHash, name);
-    await db.updateUserPlan(userId, 'trial', planExpires);
+    // Use transaction to ensure atomic user creation and plan assignment
+    const user = await db.transaction(async (client) => {
+      // Create user
+      const result = await client.query(
+        'INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4) RETURNING *',
+        [userId, email, passwordHash, name]
+      );
+      const newUser = result.rows[0];
+      
+      // Update user plan
+      await client.query(
+        'UPDATE users SET plan = $1, plan_expires = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        ['trial', planExpires, userId]
+      );
+      
+      return { ...newUser, plan: 'trial', plan_expires: planExpires };
+    });
     
     // Generate token
     const token = generateToken(user);
@@ -46,34 +64,28 @@ router.post('/signup', async (req, res) => {
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Signup failed' 
-    });
+    return ErrorResponses.internalError(res, 'Signup failed', req.id);
   }
 });
 
-// Login
-router.post('/login', async (req, res) => {
+/**
+ * Login existing user
+ * Validates credentials and returns JWT token
+ */
+router.post('/login', authLimiter, validate(schemas.login), async (req, res) => {
   const { email, password } = req.body;
   
   try {
     const user = await db.getUserByEmail(email);
     
     if (!user) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      });
+      return ErrorResponses.invalidCredentials(res, req.id);
     }
     
     // Verify password
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
-      return res.status(401).json({ 
-        error: 'invalid_credentials', 
-        message: 'Invalid email or password' 
-      });
+      return ErrorResponses.invalidCredentials(res, req.id);
     }
     
     // Generate token
@@ -91,23 +103,20 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Login failed' 
-    });
+    return ErrorResponses.internalError(res, 'Login failed', req.id);
   }
 });
 
-// Get current user
+/**
+ * Get current user profile
+ * Returns user information based on JWT token
+ */
 router.get('/me', authenticateJWT, async (req, res) => {
   try {
     const user = await db.getUserById(req.user.user_id);
     
     if (!user) {
-      return res.status(404).json({ 
-        error: 'user_not_found', 
-        message: 'User not found' 
-      });
+      return ErrorResponses.notFound(res, 'User', req.id);
     }
     
     res.json({
@@ -120,39 +129,33 @@ router.get('/me', authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get user' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get user', req.id);
   }
 });
 
-// Claim plan
-router.post('/claim-plan', authenticateJWT, async (req, res) => {
+/**
+ * Claim or upgrade user plan
+ * Updates user's subscription plan with new expiration date
+ */
+router.post('/claim-plan', authenticateJWT, validate(schemas.claimPlan), async (req, res) => {
   const { plan } = req.body;
   const userId = req.user.user_id;
   
   try {
     const user = await db.getUserById(userId);
     if (!user) {
-      return res.status(404).json({ 
-        error: 'user_not_found', 
-        message: 'User not found' 
-      });
+      return ErrorResponses.notFound(res, 'User', req.id);
     }
     
     // Set plan expiration based on plan type
     let expiresAt;
-    if (plan === 'trial') {
-      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    } else if (plan === 'pro') {
-      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-    } else {
-      return res.status(400).json({ 
-        error: 'invalid_plan', 
-        message: 'Invalid plan type' 
-      });
+    const planConfig = config.plans[plan];
+    
+    if (!planConfig) {
+      return ErrorResponses.badRequest(res, 'Invalid plan type', null, req.id);
     }
+    
+    expiresAt = new Date(Date.now() + planConfig.duration);
     
     await db.updateUserPlan(userId, plan, expiresAt);
     
@@ -163,10 +166,7 @@ router.post('/claim-plan', authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error('Claim plan error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to claim plan' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to claim plan', req.id);
   }
 });
 

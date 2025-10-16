@@ -1,16 +1,17 @@
 const { Pool } = require('pg');
+const config = require('./config');
 const { logger } = require('./utils/logger');
 
 // Database configuration
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'bore_db',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  host: config.database.host,
+  port: config.database.port,
+  database: config.database.name,
+  user: config.database.user,
+  password: config.database.password,
+  max: config.database.poolSize,
+  idleTimeoutMillis: config.database.idleTimeout,
+  connectionTimeoutMillis: config.database.connectionTimeout,
 });
 
 // Test database connection
@@ -22,7 +23,11 @@ pool.on('error', (err) => {
   logger.error('💥 Unexpected database error', err);
 });
 
-// Initialize database schema
+/**
+ * Initialize database schema
+ * Creates all required tables and indexes if they don't exist
+ * @returns {Promise<void>}
+ */
 async function initializeDatabase() {
   const client = await pool.connect();
   
@@ -157,11 +162,25 @@ async function initializeDatabase() {
   }
 }
 
-// Database query helpers
+/**
+ * Database query helpers and transaction support
+ * Provides abstracted database operations for the application
+ */
 const db = {
+  /**
+   * Execute a direct SQL query
+   * @param {string} text - SQL query text
+   * @param {Array} params - Query parameters
+   * @returns {Promise<Object>} Query result
+   */
   query: (text, params) => pool.query(text, params),
   
-  // Transaction support
+  /**
+   * Execute operations within a transaction
+   * Automatically handles BEGIN, COMMIT, and ROLLBACK
+   * @param {Function} callback - Async function that receives client and performs queries
+   * @returns {Promise<any>} Result from callback
+   */
   async transaction(callback) {
     const client = await pool.connect();
     try {

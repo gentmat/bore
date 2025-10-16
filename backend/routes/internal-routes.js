@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const config = require('../config');
 const { db } = require('../database');
 const { requireInternalApiKey } = require('../auth-middleware');
 const { incrementCounter } = require('../metrics');
 const { instanceHeartbeats } = require('./instance-routes');
+const { schemas, validate } = require('../middleware/validation');
+const { ErrorResponses } = require('../utils/error-handler');
 
-const BORE_SERVER_HOST = process.env.BORE_SERVER_HOST || '127.0.0.1';
+const BORE_SERVER_HOST = config.boreServer.host;
 
 // Validate tunnel token (called by bore-server)
-router.post('/validate-key', requireInternalApiKey, async (req, res) => {
+router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey), async (req, res) => {
   const { api_key } = req.body;
   
   try {
@@ -68,15 +71,12 @@ router.post('/validate-key', requireInternalApiKey, async (req, res) => {
 });
 
 // Tunnel connected (called by bore-server)
-router.post('/instances/:id/tunnel-connected', requireInternalApiKey, async (req, res) => {
+router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(schemas.tunnelConnected), async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     const { remotePort, publicUrl } = req.body || {};
@@ -113,10 +113,7 @@ router.post('/instances/:id/tunnel-connected', requireInternalApiKey, async (req
     res.json({ success: true });
   } catch (error) {
     console.error('Tunnel connected error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to update tunnel status' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to update tunnel status', req.id);
   }
 });
 
@@ -126,10 +123,7 @@ router.post('/instances/:id/tunnel-disconnected', requireInternalApiKey, async (
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     await db.updateInstance(instance.id, {
@@ -163,10 +157,7 @@ router.post('/instances/:id/tunnel-disconnected', requireInternalApiKey, async (
     res.json({ success: true });
   } catch (error) {
     console.error('Tunnel disconnected error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to update tunnel status' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to update tunnel status', req.id);
   }
 });
 

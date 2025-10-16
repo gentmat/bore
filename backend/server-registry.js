@@ -10,6 +10,14 @@ const servers = new Map();
 
 /**
  * Register a new bore-server instance
+ * @param {Object} serverInfo - Server configuration
+ * @param {string} serverInfo.id - Server ID
+ * @param {string} serverInfo.host - Server hostname or IP
+ * @param {number} serverInfo.port - Server port
+ * @param {string} serverInfo.location - Server location/region
+ * @param {number} serverInfo.maxBandwidthMbps - Maximum bandwidth in Mbps
+ * @param {number} serverInfo.maxConcurrentTunnels - Maximum concurrent tunnels
+ * @returns {Promise<Object>} Registered server object
  */
 async function registerServer(serverInfo) {
   const server = {
@@ -45,13 +53,15 @@ async function registerServer(serverInfo) {
 
 /**
  * Get all active servers
+ * @returns {Array} Array of active server objects
  */
 function getActiveServers() {
   return Array.from(servers.values()).filter(s => s.status === 'active');
 }
 
 /**
- * Get server with most available capacity
+ * Get server with most available capacity (lowest utilization)
+ * @returns {Object|null} Best available server or null if none available
  */
 function getBestServer() {
   const active = getActiveServers();
@@ -77,7 +87,10 @@ function getBestServer() {
 }
 
 /**
- * Update server load
+ * Update server load metrics
+ * @param {string} serverId - Server ID
+ * @param {number} load - Current number of active tunnels
+ * @param {number} bandwidthMbps - Current bandwidth usage in Mbps
  */
 function updateServerLoad(serverId, load, bandwidthMbps) {
   const server = servers.get(serverId);
@@ -90,6 +103,8 @@ function updateServerLoad(serverId, load, bandwidthMbps) {
 
 /**
  * Mark server as unhealthy
+ * @param {string} serverId - Server ID to mark as unhealthy
+ * @returns {Promise<void>}
  */
 async function markServerUnhealthy(serverId) {
   const server = servers.get(serverId);
@@ -101,7 +116,8 @@ async function markServerUnhealthy(serverId) {
 }
 
 /**
- * Get fleet statistics
+ * Get fleet-wide statistics
+ * @returns {Object} Fleet statistics including capacity, utilization, and bandwidth
  */
 function getFleetStats() {
   const active = getActiveServers();

@@ -3,7 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
-require('dotenv').config();
+const config = require('./config');
 
 // Import utilities
 const { logger } = require('./utils/logger');
@@ -26,17 +26,15 @@ const internalRoutes = require('./routes/internal-routes');
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = config.server.port;
+const JWT_SECRET = config.security.jwtSecret;
+const NODE_ENV = config.server.nodeEnv;
 
 // SSE clients tracking
 const sseClients = new Map(); // userId -> Set of response objects
 
 // CORS Configuration - Environment-based whitelist
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const ALLOWED_ORIGINS = config.cors.allowedOrigins;
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -235,7 +233,7 @@ setInterval(async () => {
     
     for (const instance of instances) {
       const lastHeartbeat = instanceHeartbeats.get(instance.id);
-      if (lastHeartbeat && (now - lastHeartbeat) > 30000) {
+      if (lastHeartbeat && (now - lastHeartbeat) > config.heartbeat.timeout) {
         const oldStatus = instance.status;
         if (oldStatus !== 'offline') {
           await db.updateInstance(instance.id, { 
@@ -253,7 +251,7 @@ setInterval(async () => {
   } catch (error) {
     logger.error('Heartbeat check error', error);
   }
-}, 5000); // Every 5 seconds
+}, config.heartbeat.checkInterval);
 
 // Initialize database and start server
 initializeDatabase()

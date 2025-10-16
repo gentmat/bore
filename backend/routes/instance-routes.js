@@ -1,16 +1,20 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
+const config = require('../config');
 const { db } = require('../database');
 const { authenticateJWT } = require('../auth-middleware');
 const { incrementCounter, recordHistogram } = require('../metrics');
+const { schemas, validate } = require('../middleware/validation');
+const { createInstanceLimiter, tunnelLimiter } = require('../middleware/rate-limiter');
+const { ErrorResponses } = require('../utils/error-handler');
 
-const BORE_SERVER_HOST = process.env.BORE_SERVER_HOST || '127.0.0.1';
-const BORE_SERVER_PORT = parseInt(process.env.BORE_SERVER_PORT || '7835', 10);
+const BORE_SERVER_HOST = config.boreServer.host;
+const BORE_SERVER_PORT = config.boreServer.port;
 
 // Heartbeat tracking (in-memory, could move to Redis for scaling)
 const instanceHeartbeats = new Map();
-const HEARTBEAT_TIMEOUT = 30000; // 30 seconds
+const HEARTBEAT_TIMEOUT = config.heartbeat.timeout;
 
 // Get all instances for user
 router.get('/', authenticateJWT, async (req, res) => {
@@ -29,15 +33,12 @@ router.get('/', authenticateJWT, async (req, res) => {
     res.json(withHeartbeat);
   } catch (error) {
     console.error('List instances error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to list instances' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to list instances', req.id);
   }
 });
 
 // Create instance
-router.post('/', authenticateJWT, async (req, res) => {
+router.post('/', authenticateJWT, createInstanceLimiter, validate(schemas.createInstance), async (req, res) => {
   const { name, local_port, region, server_host } = req.body;
   const userId = req.user.user_id;
   
@@ -57,10 +58,7 @@ router.post('/', authenticateJWT, async (req, res) => {
     res.status(201).json(instance);
   } catch (error) {
     console.error('Create instance error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to create instance' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to create instance', req.id);
   }
 });
 
@@ -70,10 +68,7 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     await db.deleteInstance(req.params.id);
@@ -82,57 +77,43 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete instance error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to delete instance' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to delete instance', req.id);
   }
 });
 
 // Rename instance
-router.patch('/:id', authenticateJWT, async (req, res) => {
+router.patch('/:id', authenticateJWT, validate(schemas.renameInstance), async (req, res) => {
   const { name } = req.body;
   
   try {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
+    // Validation middleware already checks this, but keeping for extra safety
     if (!name) {
-      return res.status(400).json({ 
-        error: 'invalid_input', 
-        message: 'Name is required' 
-      });
+      return ErrorResponses.badRequest(res, 'Name is required', null, req.id);
     }
     
     const updated = await db.updateInstance(req.params.id, { name });
     res.json({ success: true, instance: updated });
   } catch (error) {
     console.error('Rename instance error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to rename instance' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to rename instance', req.id);
   }
 });
 
 // Heartbeat endpoint
-router.post('/:id/heartbeat', authenticateJWT, async (req, res) => {
+router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), async (req, res) => {
   const startTime = Date.now();
   
   try {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     // Update heartbeat timestamp
@@ -168,23 +149,17 @@ router.post('/:id/heartbeat', authenticateJWT, async (req, res) => {
     res.json({ success: true, status, reason });
   } catch (error) {
     console.error('Heartbeat error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Heartbeat failed' 
-    });
+    return ErrorResponses.internalError(res, 'Heartbeat failed', req.id);
   }
 });
 
 // Connect to instance (get tunnel token)
-router.post('/:id/connect', authenticateJWT, async (req, res) => {
+router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => {
   try {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     // LOAD BALANCING: Get least loaded bore-server
@@ -192,10 +167,7 @@ router.post('/:id/connect', authenticateJWT, async (req, res) => {
     const bestServer = getBestServer();
     
     if (!bestServer) {
-      return res.status(503).json({ 
-        error: 'no_servers_available', 
-        message: 'All servers at capacity. Please try again later.' 
-      });
+      return ErrorResponses.serviceUnavailable(res, 'All servers at capacity. Please try again later.', req.id);
     }
     
     // Delete old token if exists
@@ -205,7 +177,7 @@ router.post('/:id/connect', authenticateJWT, async (req, res) => {
     
     // Generate new tunnel token
     const tunnelToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + config.tokens.tunnel.expiresIn);
     
     await db.saveTunnelToken(tunnelToken, instance.id, req.user.user_id, expiresAt);
     await db.updateInstance(instance.id, {
@@ -227,10 +199,7 @@ router.post('/:id/connect', authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error('Connect error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to connect' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to connect', req.id);
   }
 });
 
@@ -240,10 +209,7 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     // Delete tunnel token
@@ -266,10 +232,7 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Disconnect error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to disconnect' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to disconnect', req.id);
   }
 });
 
@@ -279,10 +242,7 @@ router.get('/:id/status-history', authenticateJWT, async (req, res) => {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     const history = await db.getStatusHistory(instance.id);
@@ -301,10 +261,7 @@ router.get('/:id/status-history', authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error('Status history error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get status history' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get status history', req.id);
   }
 });
 
@@ -314,10 +271,7 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
     const instance = await db.getInstanceById(req.params.id);
     
     if (!instance || instance.user_id !== req.user.user_id) {
-      return res.status(404).json({ 
-        error: 'instance_not_found', 
-        message: 'Instance not found' 
-      });
+      return ErrorResponses.notFound(res, 'Instance', req.id);
     }
     
     const healthMetrics = await db.getLatestHealthMetrics(instance.id);
@@ -334,14 +288,15 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
     });
   } catch (error) {
     console.error('Health metrics error:', error);
-    res.status(500).json({ 
-      error: 'internal_error', 
-      message: 'Failed to get health metrics' 
-    });
+    return ErrorResponses.internalError(res, 'Failed to get health metrics', req.id);
   }
 });
 
-// Helper: Determine instance status
+/**
+ * Helper: Determine instance status based on heartbeat and health metrics
+ * @param {Object} instance - Instance object from database
+ * @returns {Promise<Object>} Object with status and reason
+ */
 async function determineInstanceStatus(instance) {
   const now = Date.now();
   const lastHeartbeat = instanceHeartbeats.get(instance.id);
@@ -359,14 +314,18 @@ async function determineInstanceStatus(instance) {
     return { status: 'degraded', reason: 'VSCode not responding' };
   }
   
-  if (healthMetrics.last_activity && (now / 1000 - healthMetrics.last_activity) > 1800) {
-    return { status: 'idle', reason: 'No activity for 30+ minutes' };
+  if (healthMetrics.last_activity && (now / 1000 - healthMetrics.last_activity) > config.heartbeat.idleTimeout) {
+    return { status: 'idle', reason: `No activity for ${config.heartbeat.idleTimeout / 60}+ minutes` };
   }
   
   return { status: 'online', reason: 'All systems operational' };
 }
 
-// Helper: Calculate uptime metrics
+/**
+ * Helper: Calculate uptime metrics from status history
+ * @param {Array} history - Array of status history records
+ * @returns {Object} Uptime statistics
+ */
 function calculateUptimeMetrics(history) {
   if (!history || history.length === 0) {
     return { uptime_percentage: 0, total_downtime_ms: 0, incident_count: 0 };

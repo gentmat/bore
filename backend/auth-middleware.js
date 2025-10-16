@@ -1,23 +1,11 @@
 const jwt = require('jsonwebtoken');
+const config = require('./config');
 const { db } = require('./database');
 
-// Security: Fail-fast if critical secrets are not configured in production
-const NODE_ENV = process.env.NODE_ENV || 'development';
-
-if (NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET environment variable is required in production!');
-  console.error('Generate a secure secret: openssl rand -base64 32');
-  process.exit(1);
-}
-
-if (NODE_ENV === 'production' && !process.env.INTERNAL_API_KEY) {
-  console.error('FATAL: INTERNAL_API_KEY environment variable is required in production!');
-  console.error('Generate a secure key: openssl rand -hex 32');
-  process.exit(1);
-}
-
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || null;
+// Security checks are now in config.js
+const JWT_SECRET = config.security.jwtSecret;
+const INTERNAL_API_KEY = config.security.internalApiKey;
+const NODE_ENV = config.server.nodeEnv;
 
 // Warn if using default values in development
 if (NODE_ENV !== 'production' && JWT_SECRET === 'dev-secret-change-in-production') {
@@ -114,7 +102,7 @@ function generateToken(user) {
       is_admin: user.is_admin || false
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: config.tokens.jwt.expiresIn }
   );
 }
 
