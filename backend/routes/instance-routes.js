@@ -8,13 +8,47 @@ const { incrementCounter, recordHistogram } = require('../metrics');
 const { schemas, validate } = require('../middleware/validation');
 const { createInstanceLimiter, tunnelLimiter } = require('../middleware/rate-limiter');
 const { ErrorResponses } = require('../utils/error-handler');
+const redisService = require('../services/redis-service');
+const { requireCapacity, checkUserQuota } = require('../capacity-limiter');
 
 const BORE_SERVER_HOST = config.boreServer.host;
 const BORE_SERVER_PORT = config.boreServer.port;
 
-// Heartbeat tracking (in-memory, could move to Redis for scaling)
-const instanceHeartbeats = new Map();
+// Heartbeat tracking - uses Redis when available, falls back to in-memory
+const instanceHeartbeats = new Map(); // Fallback for when Redis is unavailable
 const HEARTBEAT_TIMEOUT = config.heartbeat.timeout;
+
+/**
+ * Get heartbeat timestamp for instance (Redis-aware)
+ */
+async function getHeartbeat(instanceId) {
+  if (config.redis.enabled) {
+    const timestamp = await redisService.heartbeats.get(instanceId);
+    if (timestamp !== null) return timestamp;
+  }
+  return instanceHeartbeats.get(instanceId);
+}
+
+/**
+ * Set heartbeat timestamp for instance (Redis-aware)
+ */
+async function setHeartbeat(instanceId, timestamp) {
+  if (config.redis.enabled) {
+    await redisService.heartbeats.set(instanceId, timestamp, 60);
+  }
+  // Always keep in-memory as fallback
+  instanceHeartbeats.set(instanceId, timestamp);
+}
+
+/**
+ * Delete heartbeat for instance (Redis-aware)
+ */
+async function deleteHeartbeat(instanceId) {
+  if (config.redis.enabled) {
+    await redisService.heartbeats.delete(instanceId);
+  }
+  instanceHeartbeats.delete(instanceId);
+}
 
 // Get all instances for user
 router.get('/', authenticateJWT, async (req, res) => {
@@ -22,12 +56,13 @@ router.get('/', authenticateJWT, async (req, res) => {
     const instances = await db.getInstancesByUserId(req.user.user_id);
     
     // Add heartbeat age to each instance
-    const withHeartbeat = instances.map(instance => ({
-      ...instance,
-      last_heartbeat: instanceHeartbeats.get(instance.id),
-      heartbeat_age_ms: instanceHeartbeats.get(instance.id) 
-        ? Date.now() - instanceHeartbeats.get(instance.id)
-        : null
+    const withHeartbeat = await Promise.all(instances.map(async (instance) => {
+      const lastHeartbeat = await getHeartbeat(instance.id);
+      return {
+        ...instance,
+        last_heartbeat: lastHeartbeat,
+        heartbeat_age_ms: lastHeartbeat ? Date.now() - lastHeartbeat : null
+      };
     }));
     
     res.json(withHeartbeat);
@@ -38,7 +73,7 @@ router.get('/', authenticateJWT, async (req, res) => {
 });
 
 // Create instance
-router.post('/', authenticateJWT, createInstanceLimiter, validate(schemas.createInstance), async (req, res) => {
+router.post('/', authenticateJWT, createInstanceLimiter, requireCapacity, validate(schemas.createInstance), async (req, res) => {
   const { name, local_port, region, server_host } = req.body;
   const userId = req.user.user_id;
   
@@ -72,7 +107,7 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     }
     
     await db.deleteInstance(req.params.id);
-    instanceHeartbeats.delete(req.params.id);
+    await deleteHeartbeat(req.params.id);
     
     res.json({ success: true });
   } catch (error) {
@@ -117,7 +152,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
     }
     
     // Update heartbeat timestamp
-    instanceHeartbeats.set(instance.id, Date.now());
+    await setHeartbeat(instance.id, Date.now());
     incrementCounter('heartbeatsTotal');
     
     // Store health metrics

@@ -122,20 +122,71 @@ function validate(schema, source = 'body') {
 }
 
 /**
- * Sanitize input to prevent XSS
- * Basic sanitization - for production consider using DOMPurify or similar
+ * Sanitize input to prevent XSS attacks
+ * Comprehensive sanitization for untrusted user input
+ * @param {string} input - String to sanitize
+ * @returns {string} Sanitized string
  */
 function sanitize(input) {
-  if (typeof input === 'string') {
-    return input
-      .replace(/[<>]/g, '') // Remove < and >
-      .trim();
+  if (typeof input !== 'string') {
+    return input;
   }
-  return input;
+
+  return input
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Remove script tags and content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove style tags and content
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    // Remove event handlers (onclick, onerror, etc.)
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\bon\w+\s*=\s*[^\s>]*/gi, '')
+    // Remove javascript: protocol
+    .replace(/javascript:/gi, '')
+    // Remove data: protocol (can be used for XSS)
+    .replace(/data:text\/html/gi, '')
+    // Encode special characters
+    .replace(/[<>'"&]/g, (char) => {
+      const entities = {
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#x27;',
+        '&': '&amp;'
+      };
+      return entities[char] || char;
+    })
+    // Remove null bytes
+    .replace(/\0/g, '')
+    // Trim whitespace
+    .trim();
+}
+
+/**
+ * Sanitize an object recursively
+ * @param {Object} obj - Object to sanitize
+ * @returns {Object} Sanitized object
+ */
+function sanitizeObject(obj) {
+  if (typeof obj !== 'object' || obj === null) {
+    return sanitize(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item));
+  }
+
+  const sanitized = {};
+  for (const [key, value] of Object.entries(obj)) {
+    sanitized[key] = sanitizeObject(value);
+  }
+  return sanitized;
 }
 
 module.exports = {
   schemas,
   validate,
-  sanitize
+  sanitize,
+  sanitizeObject
 };

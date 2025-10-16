@@ -46,7 +46,9 @@ async function initializeDatabase() {
         plan_expires TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+      CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan, plan_expires)
     `);
     
     // Instances table
@@ -68,7 +70,12 @@ async function initializeDatabase() {
         tunnel_token_expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      CREATE INDEX IF NOT EXISTS idx_instances_user_id ON instances(user_id);
+      CREATE INDEX IF NOT EXISTS idx_instances_status ON instances(status, user_id);
+      CREATE INDEX IF NOT EXISTS idx_instances_region ON instances(region, status);
+      CREATE INDEX IF NOT EXISTS idx_instances_tunnel_connected ON instances(tunnel_connected);
+      CREATE INDEX IF NOT EXISTS idx_instances_created_at ON instances(created_at DESC)
     `);
     
     // Status history table
@@ -106,7 +113,9 @@ async function initializeDatabase() {
         user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
+      CREATE INDEX IF NOT EXISTS idx_tunnel_tokens_instance ON tunnel_tokens(instance_id);
+      CREATE INDEX IF NOT EXISTS idx_tunnel_tokens_expires ON tunnel_tokens(expires_at)
     `);
     
     // Alert history table
@@ -149,6 +158,23 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_status_position ON waitlist(status, position)
+    `);
+    
+    // Refresh tokens table (for token refresh mechanism)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id SERIAL PRIMARY KEY,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        user_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+        user_agent TEXT,
+        ip_address VARCHAR(45),
+        revoked BOOLEAN DEFAULT FALSE,
+        revoked_at TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_token ON refresh_tokens(user_id, revoked, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_token_lookup ON refresh_tokens(token, revoked, expires_at)
     `);
     
     await client.query('COMMIT');

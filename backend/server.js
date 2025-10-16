@@ -17,6 +17,8 @@ const { authenticateJWT } = require('./auth-middleware');
 const { metricsMiddleware, generatePrometheusMetrics, updateInstanceStatusCounts } = require('./metrics');
 const { initializeWebSocket, broadcastStatusChange: wsBroadcast } = require('./websocket');
 const { alerts } = require('./alerting');
+const redisService = require('./services/redis-service');
+const { cleanupExpiredTokens } = require('./middleware/refresh-token');
 
 // Import routes
 const authRoutes = require('./routes/auth-routes');
@@ -57,7 +59,17 @@ const corsOptions = {
 app.use(requestIdMiddleware); // Must be first to track all requests
 app.use(httpLoggerMiddleware); // Log all HTTP requests
 app.use(cors(corsOptions));
-app.use(bodyParser.json());
+// Request size limits for security (prevent DOS attacks)
+app.use(bodyParser.json({ 
+  limit: '10mb', // Maximum request body size
+  strict: true,  // Only accept arrays and objects
+  type: 'application/json'
+}));
+app.use(bodyParser.urlencoded({ 
+  limit: '10mb',
+  extended: true,
+  parameterLimit: 1000 // Limit number of parameters
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(metricsMiddleware); // Track all API requests
 
@@ -121,15 +133,48 @@ function broadcastMiddleware(req, res, next) {
   next();
 }
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/instances', broadcastMiddleware, instanceRoutes);
-app.use('/api/user/instances', broadcastMiddleware, instanceRoutes); // Alias
-app.use('/api/admin', adminRoutes);
-app.use('/api/internal', broadcastMiddleware, internalRoutes);
+// API v1 Routes
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/instances', broadcastMiddleware, instanceRoutes);
+app.use('/api/v1/user/instances', broadcastMiddleware, instanceRoutes); // Alias
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/internal', broadcastMiddleware, internalRoutes);
 
-// SSE endpoint for real-time status updates
-app.get('/api/events/status', authenticateJWT, (req, res) => {
+// Backward compatibility - redirect old API paths to v1
+app.use('/api/auth*', (req, res, next) => {
+  if (!req.path.startsWith('/api/v1/')) {
+    const newPath = req.path.replace('/api/', '/api/v1/');
+    return res.redirect(308, newPath); // 308 = Permanent Redirect (preserves method)
+  }
+  next();
+});
+
+app.use('/api/instances*', (req, res, next) => {
+  if (!req.path.startsWith('/api/v1/')) {
+    const newPath = req.path.replace('/api/', '/api/v1/');
+    return res.redirect(308, newPath);
+  }
+  next();
+});
+
+app.use('/api/admin*', (req, res, next) => {
+  if (!req.path.startsWith('/api/v1/')) {
+    const newPath = req.path.replace('/api/', '/api/v1/');
+    return res.redirect(308, newPath);
+  }
+  next();
+});
+
+app.use('/api/internal*', (req, res, next) => {
+  if (!req.path.startsWith('/api/v1/')) {
+    const newPath = req.path.replace('/api/', '/api/v1/');
+    return res.redirect(308, newPath);
+  }
+  next();
+});
+
+// SSE endpoint for real-time status updates (v1)
+app.get('/api/v1/events/status', authenticateJWT, (req, res) => {
   const userId = req.user.user_id;
   
   // Set SSE headers
@@ -186,13 +231,54 @@ app.get('/metrics', (req, res) => {
     });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+// Health check endpoint with dependency verification
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'healthy',
     uptime: process.uptime(),
-    timestamp: Date.now()
-  });
+    timestamp: Date.now(),
+    checks: {}
+  };
+
+  // Check database connectivity
+  try {
+    await db.query('SELECT 1');
+    health.checks.database = { status: 'healthy', message: 'Connected' };
+  } catch (error) {
+    health.status = 'degraded';
+    health.checks.database = { 
+      status: 'unhealthy', 
+      message: error.message,
+      error: 'Database connection failed'
+    };
+  }
+
+  // Check Redis connectivity (if enabled)
+  if (config.redis.enabled) {
+    try {
+      const redisHealthy = await redisService.healthCheck();
+      health.checks.redis = { 
+        status: redisHealthy ? 'healthy' : 'unhealthy',
+        message: redisHealthy ? 'Connected' : 'Connection failed'
+      };
+      if (!redisHealthy) {
+        health.status = 'degraded';
+      }
+    } catch (error) {
+      health.status = 'degraded';
+      health.checks.redis = { 
+        status: 'unhealthy', 
+        message: error.message,
+        error: 'Redis health check failed'
+      };
+    }
+  } else {
+    health.checks.redis = { status: 'disabled', message: 'Redis not enabled' };
+  }
+
+  // Overall status
+  const statusCode = health.status === 'healthy' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // Serve HTML pages
@@ -224,15 +310,23 @@ app.get('/', (req, res) => {
 app.use(notFoundHandler); // Handle 404 for undefined routes
 app.use(globalErrorHandler); // Handle all other errors
 
-// Periodic heartbeat timeout check
+// Periodic heartbeat timeout check (Redis-aware)
 setInterval(async () => {
   try {
     const instances = await db.getAllInstances();
     const now = Date.now();
-    const { instanceHeartbeats } = require('./routes/instance-routes');
+    
+    // Get all heartbeats from Redis or fallback
+    let heartbeatMap;
+    if (config.redis.enabled) {
+      heartbeatMap = await redisService.heartbeats.getAll();
+    } else {
+      const { instanceHeartbeats } = require('./routes/instance-routes');
+      heartbeatMap = instanceHeartbeats;
+    }
     
     for (const instance of instances) {
-      const lastHeartbeat = instanceHeartbeats.get(instance.id);
+      const lastHeartbeat = heartbeatMap.get(instance.id);
       if (lastHeartbeat && (now - lastHeartbeat) > config.heartbeat.timeout) {
         const oldStatus = instance.status;
         if (oldStatus !== 'offline') {
@@ -253,49 +347,94 @@ setInterval(async () => {
   }
 }, config.heartbeat.checkInterval);
 
-// Initialize database and start server
-initializeDatabase()
-  .then(() => {
+// Periodic cleanup of expired refresh tokens (every 6 hours)
+setInterval(async () => {
+  try {
+    const deletedCount = await cleanupExpiredTokens();
+    if (deletedCount > 0) {
+      logger.info(`Cleaned up ${deletedCount} expired refresh tokens`);
+    }
+  } catch (error) {
+    logger.error('Token cleanup error', error);
+  }
+}, 6 * 60 * 60 * 1000); // 6 hours
+
+// Initialize database, Redis, and start server
+async function startServer() {
+  try {
+    // Initialize database
+    await initializeDatabase();
+    logger.info('✅ Database initialized');
+    
+    // Initialize Redis (optional - won't fail if unavailable)
+    if (config.redis.enabled) {
+      try {
+        await redisService.initializeRedis();
+        logger.info('✅ Redis initialized - horizontal scaling enabled');
+      } catch (error) {
+        logger.warn('⚠️  Redis initialization failed - falling back to in-memory state', error);
+        logger.warn('⚠️  Horizontal scaling will not work without Redis');
+      }
+    } else {
+      logger.info('ℹ️  Redis disabled - using in-memory state (single instance only)');
+    }
+    
+    // Start server
     server.listen(PORT, () => {
       logger.info('='.repeat(60));
       logger.info('🚀 Bore Backend Server Started');
       logger.info('='.repeat(60));
       logger.info(`📡 HTTP Server:      http://localhost:${PORT}`);
       logger.info(`🔌 WebSocket Server: ws://localhost:${PORT}/socket.io/`);
-      logger.info(`📊 Metrics:          http://localhost:${PORT}/metrics`);
-      logger.info(`💚 Health Check:     http://localhost:${PORT}/health`);
+      logger.info(`📊 Metrics:          http://localhost:${PORT}/api/v1/metrics`);
+      logger.info(`💚 Health Check:     http://localhost:${PORT}/api/v1/health`);
       logger.info('='.repeat(60));
-      logger.info(`📝 Sign Up:          http://localhost:${PORT}/signup`);
+      logger.info('📝 Sign Up:          http://localhost:${PORT}/signup');
       logger.info(`📝 Login:            http://localhost:${PORT}/login`);
       logger.info(`📊 Dashboard:        http://localhost:${PORT}/dashboard`);
+      logger.info('='.repeat(60));
+      logger.info('📦 API Version:       v1 (at /api/v1/*)');
       logger.info('='.repeat(60));
       logger.info('✅ Server is ready!', { 
         port: PORT, 
         env: NODE_ENV,
         corsEnabled: true,
+        redisEnabled: config.redis.enabled,
         allowedOrigins: ALLOWED_ORIGINS 
       });
       logger.info('='.repeat(60));
     });
-  })
-  .catch(error => {
-    logger.error('💥 Failed to initialize database', error);
+  } catch (error) {
+    logger.error('💥 Failed to initialize server', error);
     process.exit(1);
-  });
+  }
+}
+
+startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing server');
-  server.close(() => {
+async function gracefulShutdown(signal) {
+  logger.info(`${signal} signal received: closing server`);
+  
+  // Close HTTP server
+  server.close(async () => {
+    logger.info('HTTP server closed');
+    
+    // Close Redis connection
+    if (config.redis.enabled) {
+      await redisService.shutdown();
+    }
+    
     logger.info('Server closed gracefully');
     process.exit(0);
   });
-});
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing server');
-  server.close(() => {
-    logger.info('Server closed gracefully');
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

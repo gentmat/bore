@@ -1,0 +1,61 @@
+{
+  "compilerOptions": {
+    // Target ES2020 for modern Node.js features
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    
+    // Allow JavaScript files for gradual migration
+    "allowJs": true,
+    "checkJs": false,  // Don't type-check JS files initially
+    
+    // Output configuration
+    "outDir": "./dist",
+    "rootDir": "./",
+    "sourceMap": true,
+    
+    // Module resolution
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    
+    // Type checking
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    
+    // Additional checks
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    
+    // Advanced options
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    // Decorators (for future use with frameworks)
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    
+    // Type definitions
+    "types": ["node", "jest"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.js",
+    "public"
+  ]
+}

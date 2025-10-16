@@ -7,6 +7,7 @@ const { generateToken, authenticateJWT } = require('../auth-middleware');
 const { schemas, validate } = require('../middleware/validation');
 const { authLimiter } = require('../middleware/rate-limiter');
 const { ErrorResponses } = require('../utils/error-handler');
+const { createRefreshToken, validateRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../middleware/refresh-token');
 
 /**
  * Sign up new user
@@ -49,11 +50,18 @@ router.post('/signup', authLimiter, validate(schemas.signup), async (req, res) =
       return { ...newUser, plan: 'trial', plan_expires: planExpires };
     });
     
-    // Generate token
+    // Generate access token and refresh token
     const token = generateToken(user);
+    const { token: refreshToken, expiresAt } = await createRefreshToken(
+      user.id,
+      req.get('user-agent'),
+      req.ip
+    );
     
     res.status(201).json({
       token,
+      refreshToken,
+      refreshTokenExpiresAt: expiresAt,
       user: {
         id: user.id,
         email: user.email,
@@ -88,11 +96,18 @@ router.post('/login', authLimiter, validate(schemas.login), async (req, res) => 
       return ErrorResponses.invalidCredentials(res, req.id);
     }
     
-    // Generate token
+    // Generate access token and refresh token
     const token = generateToken(user);
+    const { token: refreshToken, expiresAt } = await createRefreshToken(
+      user.id,
+      req.get('user-agent'),
+      req.ip
+    );
     
     res.json({
       token,
+      refreshToken,
+      refreshTokenExpiresAt: expiresAt,
       user: {
         id: user.id,
         email: user.email,
@@ -167,6 +182,85 @@ router.post('/claim-plan', authenticateJWT, validate(schemas.claimPlan), async (
   } catch (error) {
     console.error('Claim plan error:', error);
     return ErrorResponses.internalError(res, 'Failed to claim plan', req.id);
+  }
+});
+
+/**
+ * Refresh access token using refresh token
+ * Provides token rotation - old refresh token is revoked, new one issued
+ */
+router.post('/refresh', authLimiter, async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  if (!refreshToken) {
+    return ErrorResponses.badRequest(res, 'Refresh token is required', null, req.id);
+  }
+  
+  try {
+    // Validate refresh token
+    const tokenData = await validateRefreshToken(refreshToken);
+    
+    if (!tokenData) {
+      return ErrorResponses.unauthorized(res, 'Invalid or expired refresh token', req.id);
+    }
+    
+    // Get user
+    const user = await db.getUserById(tokenData.user_id);
+    if (!user) {
+      return ErrorResponses.notFound(res, 'User', req.id);
+    }
+    
+    // Revoke old refresh token (token rotation)
+    await revokeRefreshToken(refreshToken);
+    
+    // Generate new tokens
+    const newAccessToken = generateToken(user);
+    const { token: newRefreshToken, expiresAt } = await createRefreshToken(
+      user.id,
+      req.get('user-agent'),
+      req.ip
+    );
+    
+    res.json({
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+      refreshTokenExpiresAt: expiresAt
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return ErrorResponses.internalError(res, 'Token refresh failed', req.id);
+  }
+});
+
+/**
+ * Logout - revoke refresh token
+ */
+router.post('/logout', authenticateJWT, async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  try {
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
+    
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return ErrorResponses.internalError(res, 'Logout failed', req.id);
+  }
+});
+
+/**
+ * Logout from all devices - revoke all refresh tokens
+ */
+router.post('/logout-all', authenticateJWT, async (req, res) => {
+  try {
+    await revokeAllUserTokens(req.user.user_id);
+    
+    res.json({ success: true, message: 'Logged out from all devices' });
+  } catch (error) {
+    console.error('Logout all error:', error);
+    return ErrorResponses.internalError(res, 'Logout all failed', req.id);
   }
 });
 
