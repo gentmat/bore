@@ -7,6 +7,7 @@ const { incrementCounter } = require('../metrics');
 const { instanceHeartbeats } = require('./instance-routes');
 const { schemas, validate } = require('../middleware/validation');
 const { ErrorResponses } = require('../utils/error-handler');
+const { logger } = require('../utils/logger');
 
 const BORE_SERVER_HOST = config.boreServer.host;
 
@@ -61,7 +62,7 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
       message: 'Token validated'
     });
   } catch (error) {
-    console.error('Validate key error:', error);
+    logger.error('Validate key error', error);
     res.status(500).json({
       valid: false,
       usage_allowed: false,
@@ -112,7 +113,7 @@ router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(s
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Tunnel connected error:', error);
+    logger.error('Tunnel connected error', error);
     return ErrorResponses.internalError(res, 'Failed to update tunnel status', req.id);
   }
 });
@@ -156,7 +157,7 @@ router.post('/instances/:id/tunnel-disconnected', requireInternalApiKey, async (
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Tunnel disconnected error:', error);
+    logger.error('Tunnel disconnected error', error);
     return ErrorResponses.internalError(res, 'Failed to update tunnel status', req.id);
   }
 });

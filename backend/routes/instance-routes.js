@@ -10,6 +10,7 @@ const { createInstanceLimiter, tunnelLimiter } = require('../middleware/rate-lim
 const { ErrorResponses } = require('../utils/error-handler');
 const redisService = require('../services/redis-service');
 const { requireCapacity, checkUserQuota } = require('../capacity-limiter');
+const { logger } = require('../utils/logger');
 
 const BORE_SERVER_HOST = config.boreServer.host;
 const BORE_SERVER_PORT = config.boreServer.port;
@@ -67,7 +68,7 @@ router.get('/', authenticateJWT, async (req, res) => {
     
     res.json(withHeartbeat);
   } catch (error) {
-    console.error('List instances error:', error);
+    logger.error('List instances error', error);
     return ErrorResponses.internalError(res, 'Failed to list instances', req.id);
   }
 });
@@ -92,7 +93,7 @@ router.post('/', authenticateJWT, createInstanceLimiter, requireCapacity, valida
     
     res.status(201).json(instance);
   } catch (error) {
-    console.error('Create instance error:', error);
+    logger.error('Create instance error', error);
     return ErrorResponses.internalError(res, 'Failed to create instance', req.id);
   }
 });
@@ -111,7 +112,7 @@ router.delete('/:id', authenticateJWT, async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Delete instance error:', error);
+    logger.error('Delete instance error', error);
     return ErrorResponses.internalError(res, 'Failed to delete instance', req.id);
   }
 });
@@ -135,7 +136,7 @@ router.patch('/:id', authenticateJWT, validate(schemas.renameInstance), async (r
     const updated = await db.updateInstance(req.params.id, { name });
     res.json({ success: true, instance: updated });
   } catch (error) {
-    console.error('Rename instance error:', error);
+    logger.error('Rename instance error', error);
     return ErrorResponses.internalError(res, 'Failed to rename instance', req.id);
   }
 });
@@ -183,7 +184,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
     recordHistogram('heartbeatResponseTimes', Date.now() - startTime);
     res.json({ success: true, status, reason });
   } catch (error) {
-    console.error('Heartbeat error:', error);
+    logger.error('Heartbeat error', error);
     return ErrorResponses.internalError(res, 'Heartbeat failed', req.id);
   }
 });
@@ -199,7 +200,7 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => 
     
     // LOAD BALANCING: Get least loaded bore-server
     const { getBestServer } = require('../server-registry');
-    const bestServer = getBestServer();
+    const bestServer = await getBestServer();
     
     if (!bestServer) {
       return ErrorResponses.serviceUnavailable(res, 'All servers at capacity. Please try again later.', req.id);
@@ -233,7 +234,7 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req, res) => 
       }
     });
   } catch (error) {
-    console.error('Connect error:', error);
+    logger.error('Connect error', error);
     return ErrorResponses.internalError(res, 'Failed to connect', req.id);
   }
 });
@@ -266,7 +267,7 @@ router.post('/:id/disconnect', authenticateJWT, async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Disconnect error:', error);
+    logger.error('Disconnect error', error);
     return ErrorResponses.internalError(res, 'Failed to disconnect', req.id);
   }
 });
@@ -295,7 +296,7 @@ router.get('/:id/status-history', authenticateJWT, async (req, res) => {
       uptime_data: calculateUptimeMetrics(history)
     });
   } catch (error) {
-    console.error('Status history error:', error);
+    logger.error('Status history error', error);
     return ErrorResponses.internalError(res, 'Failed to get status history', req.id);
   }
 });
@@ -322,7 +323,7 @@ router.get('/:id/health', authenticateJWT, async (req, res) => {
       heartbeat_age_ms: lastHeartbeat ? Date.now() - lastHeartbeat : null
     });
   } catch (error) {
-    console.error('Health metrics error:', error);
+    logger.error('Health metrics error', error);
     return ErrorResponses.internalError(res, 'Failed to get health metrics', req.id);
   }
 });

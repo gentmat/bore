@@ -8,6 +8,7 @@ const { schemas, validate } = require('../middleware/validation');
 const { authLimiter } = require('../middleware/rate-limiter');
 const { ErrorResponses } = require('../utils/error-handler');
 const { createRefreshToken, validateRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../middleware/refresh-token');
+const { logger } = require('../utils/logger');
 
 /**
  * Sign up new user
@@ -71,7 +72,7 @@ router.post('/signup', authLimiter, validate(schemas.signup), async (req, res) =
       }
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    logger.error('Signup error', error);
     return ErrorResponses.internalError(res, 'Signup failed', req.id);
   }
 });
@@ -117,7 +118,7 @@ router.post('/login', authLimiter, validate(schemas.login), async (req, res) => 
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error', error);
     return ErrorResponses.internalError(res, 'Login failed', req.id);
   }
 });
@@ -143,7 +144,7 @@ router.get('/me', authenticateJWT, async (req, res) => {
       is_admin: user.is_admin
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error', error);
     return ErrorResponses.internalError(res, 'Failed to get user', req.id);
   }
 });
@@ -180,7 +181,7 @@ router.post('/claim-plan', authenticateJWT, validate(schemas.claimPlan), async (
       expires_at: expiresAt.toISOString() 
     });
   } catch (error) {
-    console.error('Claim plan error:', error);
+    logger.error('Claim plan error', error);
     return ErrorResponses.internalError(res, 'Failed to claim plan', req.id);
   }
 });
@@ -227,7 +228,7 @@ router.post('/refresh', authLimiter, async (req, res) => {
       refreshTokenExpiresAt: expiresAt
     });
   } catch (error) {
-    console.error('Token refresh error:', error);
+    logger.error('Token refresh error', error);
     return ErrorResponses.internalError(res, 'Token refresh failed', req.id);
   }
 });
@@ -245,7 +246,7 @@ router.post('/logout', authenticateJWT, async (req, res) => {
     
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout error', error);
     return ErrorResponses.internalError(res, 'Logout failed', req.id);
   }
 });
@@ -259,7 +260,7 @@ router.post('/logout-all', authenticateJWT, async (req, res) => {
     
     res.json({ success: true, message: 'Logged out from all devices' });
   } catch (error) {
-    console.error('Logout all error:', error);
+    logger.error('Logout all error', error);
     return ErrorResponses.internalError(res, 'Logout all failed', req.id);
   }
 });

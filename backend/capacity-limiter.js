@@ -4,83 +4,116 @@
  */
 
 const { db } = require('./database');
+const config = require('./config');
+const { getFleetStats } = require('./server-registry');
+const { logger } = require('./utils/logger');
 
-// Configuration - ADJUST THESE BASED ON YOUR HARDWARE
-const CAPACITY_CONFIG = {
-  // Maximum concurrent tunnels per bore-server instance
-  maxTunnelsPerServer: 100,
-  
-  // Maximum bandwidth per tunnel (Mbps) - prevents one user hogging all bandwidth
-  maxBandwidthPerTunnel: 100, // 100 Mbps
-  
-  // Maximum tunnels per user (by plan)
-  maxTunnelsByPlan: {
-    trial: 1,    // Free tier: 1 tunnel
-    pro: 5,      // Pro tier: 5 tunnels
-    enterprise: 20  // Enterprise: 20 tunnels
-  },
-  
-  // Total system capacity (adjust as you add servers)
-  totalSystemCapacity: 100, // Start with 100, increase as you add machines
-  
-  // Reserve capacity for existing users
-  reservedCapacityPercent: 20, // Keep 20% for existing users
+// Configuration from environment variables
+const CAPACITY_CONFIG = config.capacity;
+
+// Maximum tunnels per user by plan (from config)
+const maxTunnelsByPlan = {
+  trial: config.plans.trial.maxConcurrentTunnels,
+  pro: config.plans.pro.maxConcurrentTunnels,
+  enterprise: config.plans.enterprise.maxConcurrentTunnels
 };
 
 /**
  * Check if system has capacity for new tunnel
+ * Uses real-time data from server registry
  */
 async function checkSystemCapacity() {
-  // Count active tunnels across all instances
-  const instances = await db.query(
-    'SELECT COUNT(*) as active FROM instances WHERE tunnel_connected = TRUE'
-  );
-  
-  const activeTunnels = parseInt(instances.rows[0].active);
-  const availableCapacity = CAPACITY_CONFIG.totalSystemCapacity - activeTunnels;
-  const reservedSlots = Math.floor(CAPACITY_CONFIG.totalSystemCapacity * CAPACITY_CONFIG.reservedCapacityPercent / 100);
-  
-  return {
-    hasCapacity: activeTunnels < (CAPACITY_CONFIG.totalSystemCapacity - reservedSlots),
-    activeTunnels,
-    totalCapacity: CAPACITY_CONFIG.totalSystemCapacity,
-    availableSlots: availableCapacity,
-    utilizationPercent: (activeTunnels / CAPACITY_CONFIG.totalSystemCapacity) * 100
-  };
+  try {
+    // Get real-time fleet statistics
+    const fleetStats = await getFleetStats();
+    
+    // If we have active servers, use their reported capacity
+    if (fleetStats.serverCount > 0) {
+      const availableCapacity = fleetStats.totalCapacity - fleetStats.totalLoad;
+      const reservedSlots = Math.floor(fleetStats.totalCapacity * CAPACITY_CONFIG.reservedCapacityPercent / 100);
+      
+      return {
+        hasCapacity: fleetStats.totalLoad < (fleetStats.totalCapacity - reservedSlots),
+        activeTunnels: fleetStats.totalLoad,
+        totalCapacity: fleetStats.totalCapacity,
+        availableSlots: availableCapacity,
+        utilizationPercent: fleetStats.utilizationPercent,
+        serverCount: fleetStats.serverCount,
+        bandwidthUtilization: fleetStats.bandwidthUtilizationPercent
+      };
+    }
+    
+    // Fallback: count from database
+    const instances = await db.query(
+      'SELECT COUNT(*) as active FROM instances WHERE tunnel_connected = TRUE'
+    );
+    
+    const activeTunnels = parseInt(instances.rows[0].active);
+    const totalCapacity = CAPACITY_CONFIG.totalSystemCapacity;
+    const availableCapacity = totalCapacity - activeTunnels;
+    const reservedSlots = Math.floor(totalCapacity * CAPACITY_CONFIG.reservedCapacityPercent / 100);
+    
+    return {
+      hasCapacity: activeTunnels < (totalCapacity - reservedSlots),
+      activeTunnels,
+      totalCapacity,
+      availableSlots: availableCapacity,
+      utilizationPercent: (activeTunnels / totalCapacity) * 100,
+      serverCount: 0,
+      bandwidthUtilization: 0
+    };
+  } catch (error) {
+    logger.error('System capacity check error', error);
+    // Conservative approach: assume we're at capacity if check fails
+    return {
+      hasCapacity: false,
+      error: error.message
+    };
+  }
 }
 
 /**
  * Check if user can create more tunnels
  */
 async function checkUserQuota(userId) {
-  const user = await db.getUserById(userId);
-  if (!user) return { allowed: false, reason: 'User not found' };
-  
-  const plan = user.plan || 'trial';
-  const maxTunnels = CAPACITY_CONFIG.maxTunnelsByPlan[plan] || 1;
-  
-  // Count user's active tunnels
-  const result = await db.query(
-    'SELECT COUNT(*) as count FROM instances WHERE user_id = $1 AND tunnel_connected = TRUE',
-    [userId]
-  );
-  
-  const activeTunnels = parseInt(result.rows[0].count);
-  
-  return {
-    allowed: activeTunnels < maxTunnels,
-    activeTunnels,
-    maxTunnels,
-    plan,
-    reason: activeTunnels >= maxTunnels ? `Plan limit reached (${maxTunnels} tunnels)` : null
-  };
+  try {
+    const user = await db.getUserById(userId);
+    if (!user) return { allowed: false, reason: 'User not found' };
+    
+    const plan = user.plan || 'trial';
+    const maxTunnels = maxTunnelsByPlan[plan] || 1;
+    
+    // Count user's active tunnels
+    const result = await db.query(
+      'SELECT COUNT(*) as count FROM instances WHERE user_id = $1 AND tunnel_connected = TRUE',
+      [userId]
+    );
+    
+    const activeTunnels = parseInt(result.rows[0].count);
+    
+    return {
+      allowed: activeTunnels < maxTunnels,
+      activeTunnels,
+      maxTunnels,
+      plan,
+      reason: activeTunnels >= maxTunnels ? `Plan limit reached (${maxTunnels} tunnels)` : null
+    };
+  } catch (error) {
+    logger.error('User quota check error', error);
+    return {
+      allowed: false,
+      reason: 'Failed to check quota',
+      error: error.message
+    };
+  }
 }
 
 /**
  * Get least loaded bore-server
+ * @deprecated Use server-registry.getBestServer() instead
  */
 async function getLeastLoadedServer(availableServers) {
-  // availableServers = [{ host: '192.168.1.100', port: 7835, currentLoad: 45 }, ...]
+  logger.warn('getLeastLoadedServer is deprecated, use server-registry.getBestServer()');
   
   if (!availableServers || availableServers.length === 0) {
     return null;
@@ -143,7 +176,7 @@ async function requireCapacity(req, res, next) {
     
     next();
   } catch (error) {
-    console.error('Capacity check error:', error);
+    logger.error('Capacity check error', error);
     // Fail open (allow request) if check fails - adjust based on preference
     next();
   }
@@ -154,14 +187,14 @@ async function requireCapacity(req, res, next) {
  */
 async function getCapacityStats() {
   const systemCheck = await checkSystemCapacity();
-  
-  // Get per-server load (you'll need to track this in Redis or DB)
-  const servers = await getServerLoads();
+  const fleetStats = await getFleetStats();
   
   return {
     system: systemCheck,
-    servers: servers,
-    alerts: generateCapacityAlerts(systemCheck)
+    fleet: fleetStats,
+    servers: fleetStats.servers,
+    alerts: generateCapacityAlerts(systemCheck),
+    timestamp: new Date().toISOString()
   };
 }
 
@@ -195,23 +228,27 @@ function generateCapacityAlerts(capacityInfo) {
 }
 
 /**
- * Placeholder - get server loads from your monitoring system
+ * Get real-time server loads from Redis/Database
+ * @returns {Promise<Array>} Array of server load information
  */
 async function getServerLoads() {
-  // TODO: Implement actual server load tracking
-  // This should query Redis or your monitoring system
-  return [
-    { host: '192.168.1.100', port: 7835, currentLoad: 45, maxLoad: 100, status: 'healthy' },
-    { host: '192.168.1.101', port: 7835, currentLoad: 67, maxLoad: 100, status: 'healthy' },
-  ];
+  try {
+    const fleetStats = await getFleetStats();
+    return fleetStats.servers || [];
+  } catch (error) {
+    logger.error('Failed to get server loads', error);
+    return [];
+  }
 }
 
 /**
  * Update capacity configuration (when you add new servers)
+ * Note: This only updates runtime config. For persistent changes, update environment variables.
  */
 function updateCapacity(newTotalCapacity) {
+  logger.warn('updateCapacity() modifies runtime config only. Update TOTAL_SYSTEM_CAPACITY env var for persistent changes.');
   CAPACITY_CONFIG.totalSystemCapacity = newTotalCapacity;
-  console.log(`✅ System capacity updated to ${newTotalCapacity} tunnels`);
+  logger.info(`✅ System capacity updated to ${newTotalCapacity} tunnels (runtime only)`);
 }
 
 module.exports = {

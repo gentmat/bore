@@ -80,6 +80,36 @@ function getClient() {
 }
 
 /**
+ * Scan Redis keys with pattern (production-safe alternative to KEYS)
+ * @param {string} pattern - Key pattern to match (e.g., 'heartbeat:*')
+ * @returns {Promise<Array<string>>} Array of matching keys
+ */
+async function scanKeys(pattern) {
+  const client = getClient();
+  if (!client) return [];
+  
+  try {
+    const keys = [];
+    let cursor = 0;
+    
+    do {
+      const result = await client.scan(cursor, {
+        MATCH: pattern,
+        COUNT: 100
+      });
+      
+      cursor = result.cursor;
+      keys.push(...result.keys);
+    } while (cursor !== 0);
+    
+    return keys;
+  } catch (error) {
+    logger.error(`Failed to scan keys with pattern ${pattern}`, error);
+    return [];
+  }
+}
+
+/**
  * Heartbeat operations
  */
 const heartbeats = {
@@ -145,7 +175,7 @@ const heartbeats = {
     if (!client) return new Map();
     
     try {
-      const keys = await client.keys('heartbeat:*');
+      const keys = await scanKeys('heartbeat:*');
       const heartbeatMap = new Map();
       
       for (const key of keys) {
@@ -213,7 +243,7 @@ const servers = {
     if (!client) return new Map();
     
     try {
-      const keys = await client.keys('server:*');
+      const keys = await scanKeys('server:*');
       const serverMap = new Map();
       
       for (const key of keys) {

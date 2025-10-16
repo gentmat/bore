@@ -46,7 +46,7 @@ const corsOptions = {
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || NODE_ENV === 'development') {
       callback(null, true);
     } else {
-      console.warn(`⚠️  CORS: Blocked request from unauthorized origin: ${origin}`);
+      logger.warn(`CORS: Blocked request from unauthorized origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -90,7 +90,7 @@ function broadcastStatusChange(userId, instanceId, status) {
         client.write(message);
       } catch (err) {
         // Client disconnected - mark for removal
-        console.warn(`SSE write failed for user ${userId}, marking for cleanup`);
+        logger.warn(`SSE write failed for user ${userId}, marking for cleanup`);
         deadClients.push(client);
       }
     }
@@ -189,7 +189,7 @@ app.get('/api/v1/events/status', authenticateJWT, (req, res) => {
   }
   sseClients.get(userId).add(res);
   
-  console.log(`✅ SSE client connected for user ${userId} (total: ${sseClients.get(userId).size})`);
+  logger.info(`SSE client connected for user ${userId} (total: ${sseClients.get(userId).size})`);
   
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
@@ -203,14 +203,14 @@ app.get('/api/v1/events/status', authenticateJWT, (req, res) => {
         sseClients.delete(userId);
       }
     }
-    console.log(`🔌 SSE client disconnected for user ${userId} (remaining: ${clients ? clients.size : 0})`);
+    logger.info(`SSE client disconnected for user ${userId} (remaining: ${clients ? clients.size : 0})`);
   };
   
   // Handle all disconnect scenarios
   req.on('close', cleanup);
   req.on('end', cleanup);
   res.on('error', (err) => {
-    console.warn(`⚠️  SSE error for user ${userId}:`, err.message);
+    logger.warn(`SSE error for user ${userId}: ${err.message}`);
     cleanup();
   });
   res.on('finish', cleanup);
@@ -226,7 +226,7 @@ app.get('/metrics', (req, res) => {
       res.send(generatePrometheusMetrics());
     })
     .catch(error => {
-      console.error('Metrics error:', error);
+      logger.error('Metrics error', error);
       res.status(500).send('# Error generating metrics\n');
     });
 });

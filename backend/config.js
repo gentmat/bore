@@ -111,6 +111,14 @@ const config = {
     },
   },
 
+  // Capacity Management Configuration
+  capacity: {
+    maxTunnelsPerServer: parseInt(process.env.MAX_TUNNELS_PER_SERVER, 10) || 100,
+    maxBandwidthPerTunnel: parseInt(process.env.MAX_BANDWIDTH_PER_TUNNEL, 10) || 100, // Mbps
+    totalSystemCapacity: parseInt(process.env.TOTAL_SYSTEM_CAPACITY, 10) || 100,
+    reservedCapacityPercent: parseInt(process.env.RESERVED_CAPACITY_PERCENT, 10) || 20,
+  },
+
   // Alerting Configuration (Optional)
   alerting: {
     slack: {
