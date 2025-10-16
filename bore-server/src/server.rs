@@ -228,43 +228,7 @@ impl Server {
                     "User authenticated successfully"
                 );
 
-                // Atomically check and increment concurrent tunnel limit
-                // This prevents race conditions where multiple connections check at the same time
-                use dashmap::mapref::entry::Entry;
-                let limit_ok = match self.user_tunnels.entry(user_id.clone()) {
-                    Entry::Occupied(mut entry) => {
-                        let current = *entry.get();
-                        if current >= max_tunnels {
-                            warn!(
-                                user_id = %user_id,
-                                current = current,
-                                max = max_tunnels,
-                                "Concurrent tunnel limit reached"
-                            );
-                            false
-                        } else {
-                            *entry.get_mut() += 1;
-                            true
-                        }
-                    }
-                    Entry::Vacant(entry) => {
-                        if max_tunnels == 0 {
-                            warn!(user_id = %user_id, "Concurrent tunnel limit is 0");
-                            false
-                        } else {
-                            entry.insert(1);
-                            true
-                        }
-                    }
-                };
-                
-                if !limit_ok {
-                    stream.send(ServerMessage::Error(format!(
-                        "Maximum concurrent tunnels ({}) reached. Please disconnect an existing tunnel or upgrade your plan.",
-                        max_tunnels
-                    ))).await?;
-                    return Ok(());
-                }
+                // Note: Tunnel limit will be checked atomically in handle_tunnel_session
 
                 // Now expect Hello message with port request
                 match stream.recv_timeout().await? {
@@ -338,12 +302,58 @@ impl Server {
         user_id: String,
         instance_id: Option<String>,
         requested_port: u16,
-        _max_tunnels: u32,
+        max_tunnels: u32,
     ) -> Result<()> {
+        // Atomically check and increment concurrent tunnel limit
+        // This prevents race conditions where multiple connections check at the same time
+        use dashmap::mapref::entry::Entry;
+        let limit_ok = match self.user_tunnels.entry(user_id.clone()) {
+            Entry::Occupied(mut entry) => {
+                let current = *entry.get();
+                if current >= max_tunnels {
+                    warn!(
+                        user_id = %user_id,
+                        current = current,
+                        max = max_tunnels,
+                        "Concurrent tunnel limit reached"
+                    );
+                    false
+                } else {
+                    *entry.get_mut() += 1;
+                    true
+                }
+            }
+            Entry::Vacant(entry) => {
+                if max_tunnels == 0 {
+                    warn!(user_id = %user_id, "Concurrent tunnel limit is 0");
+                    false
+                } else {
+                    entry.insert(1);
+                    true
+                }
+            }
+        };
+        
+        if !limit_ok {
+            stream.send(ServerMessage::Error(format!(
+                "Maximum concurrent tunnels ({}) reached. Please disconnect an existing tunnel or upgrade your plan.",
+                max_tunnels
+            ))).await?;
+            return Ok(());
+        }
+        
         // Create listener
         let listener = match self.create_listener(requested_port).await {
             Ok(listener) => listener,
             Err(err) => {
+                // Decrement the count since we're not creating a tunnel
+                if let Some(mut count) = self.user_tunnels.get_mut(&user_id) {
+                    *count = count.saturating_sub(1);
+                    if *count == 0 {
+                        drop(count);
+                        self.user_tunnels.remove(&user_id);
+                    }
+                }
                 stream.send(ServerMessage::Error(err.into())).await?;
                 return Ok(());
             }
@@ -374,12 +384,6 @@ impl Server {
                 }
             });
         }
-
-        // Increment user's tunnel count
-        self.user_tunnels
-            .entry(user_id.clone())
-            .and_modify(|count| *count += 1)
-            .or_insert(1);
 
         // Log tunnel start with backend
         let session_id = match self
