@@ -75,13 +75,29 @@ impl Client {
         // Send Hello to request port
         stream.send(ClientMessage::Hello(port)).await?;
         
-        // Receive response
-        let remote_port = match stream.recv_timeout().await? {
+        // Receive response - may be Hello or Challenge
+        let first_response = stream.recv_timeout().await?;
+        
+        let remote_port = match first_response {
+            Some(ServerMessage::Challenge(_)) => {
+                // Server sent a challenge - we need to authenticate
+                if let Some(ref authenticator) = auth {
+                    info!("Received challenge, performing HMAC handshake");
+                    authenticator.client_handshake(&mut stream).await?;
+                    
+                    // Now wait for the Hello message after successful auth
+                    match stream.recv_timeout().await? {
+                        Some(ServerMessage::Hello(remote_port)) => remote_port,
+                        Some(ServerMessage::Error(message)) => bail!("server error: {message}"),
+                        Some(_) => bail!("unexpected message after authentication"),
+                        None => bail!("unexpected EOF after authentication"),
+                    }
+                } else {
+                    bail!("server requires authentication, but no client secret was provided");
+                }
+            }
             Some(ServerMessage::Hello(remote_port)) => remote_port,
             Some(ServerMessage::Error(message)) => bail!("server error: {message}"),
-            Some(ServerMessage::Challenge(_)) => {
-                bail!("server requires authentication, but no client secret was provided");
-            }
             Some(_) => bail!("unexpected initial non-hello message"),
             None => bail!("unexpected EOF"),
         };

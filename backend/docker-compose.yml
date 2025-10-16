@@ -87,15 +87,15 @@ services:
     networks:
       - bore-network
 
-  # Bore Server (Rust tunnel server) - OPTIONAL on master
+  # Bore Server (Rust tunnel server)
   # Controlled by ENABLE_MASTER_TUNNEL in .env
   # 
-  # For TESTING:  Set ENABLE_MASTER_TUNNEL=true
-  # For PRODUCTION: Set ENABLE_MASTER_TUNNEL=false (run on separate VPS)
+  # ENABLE_MASTER_TUNNEL=true  → bore-server starts automatically
+  # ENABLE_MASTER_TUNNEL=false → bore-server won't start
   bore-server:
     build:
-      context: ../bore-server
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: bore-server/Dockerfile
     container_name: bore-server
     ports:
       - "7835:7835"
@@ -114,7 +114,7 @@ services:
     networks:
       - bore-network
     profiles:
-      - with-tunnel  # Only starts if profile is active
+      - tunnel  # Controlled by COMPOSE_PROFILES in .env
 
   # Prometheus (optional - for metrics)
   prometheus:

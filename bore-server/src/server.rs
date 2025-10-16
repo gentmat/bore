@@ -228,15 +228,37 @@ impl Server {
                     "User authenticated successfully"
                 );
 
-                // Check concurrent tunnel limit
-                let current_tunnels = self.user_tunnels.get(&user_id).map(|v| *v).unwrap_or(0);
-                if current_tunnels >= max_tunnels {
-                    warn!(
-                        user_id = %user_id,
-                        current = current_tunnels,
-                        max = max_tunnels,
-                        "Concurrent tunnel limit reached"
-                    );
+                // Atomically check and increment concurrent tunnel limit
+                // This prevents race conditions where multiple connections check at the same time
+                use dashmap::mapref::entry::Entry;
+                let limit_ok = match self.user_tunnels.entry(user_id.clone()) {
+                    Entry::Occupied(mut entry) => {
+                        let current = *entry.get();
+                        if current >= max_tunnels {
+                            warn!(
+                                user_id = %user_id,
+                                current = current,
+                                max = max_tunnels,
+                                "Concurrent tunnel limit reached"
+                            );
+                            false
+                        } else {
+                            *entry.get_mut() += 1;
+                            true
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        if max_tunnels == 0 {
+                            warn!(user_id = %user_id, "Concurrent tunnel limit is 0");
+                            false
+                        } else {
+                            entry.insert(1);
+                            true
+                        }
+                    }
+                };
+                
+                if !limit_ok {
                     stream.send(ServerMessage::Error(format!(
                         "Maximum concurrent tunnels ({}) reached. Please disconnect an existing tunnel or upgrade your plan.",
                         max_tunnels
@@ -259,6 +281,17 @@ impl Server {
                 }
             }
             Some(ClientMessage::Hello(port)) => {
+                // Client sent Hello without Authenticate - check if this is allowed
+                
+                // If backend is enabled, reject unauthenticated Hello
+                if self.backend.enabled && self.auth.is_none() {
+                    warn!("Rejecting unauthenticated Hello - backend auth required");
+                    stream.send(ServerMessage::Error(
+                        "Authentication required. Please provide a valid API key.".to_string()
+                    )).await?;
+                    return Ok(());
+                }
+                
                 // Legacy mode: using shared secret or no auth
                 if let Some(auth) = &self.auth {
                     // Send challenge and validate

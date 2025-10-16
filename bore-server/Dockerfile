@@ -1,5 +1,5 @@
 # Multi-stage build for bore-server
-FROM rust:1.75-slim as builder
+FROM rust:1.81-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,15 +10,16 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy Cargo files
+# Copy workspace files
 COPY Cargo.toml Cargo.lock ./
-COPY bore-shared ../bore-shared/
 
-# Copy source code
-COPY . .
+# Copy all workspace members
+COPY bore-shared ./bore-shared/
+COPY bore-server ./bore-server/
+COPY bore-client ./bore-client/
 
-# Build release binary
-RUN cargo build --release --bin bore
+# Build bore-server from workspace root
+RUN cargo build --release -p bore-server --bin bore-server
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -33,7 +34,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1001 bore
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/bore /usr/local/bin/bore
+COPY --from=builder /app/target/release/bore-server /usr/local/bin/bore-server
 
 # Set user
 USER bore
@@ -43,7 +44,7 @@ EXPOSE 7835
 
 # Health check (ping the server)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD bore --help || exit 1
+  CMD bore-server --help || exit 1
 
 # Run server
-CMD ["bore", "server"]
+CMD ["bore-server"]

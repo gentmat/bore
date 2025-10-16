@@ -63,7 +63,7 @@ struct UsageLogRequest {
 pub struct BackendClient {
     http_client: Client,
     base_url: String,
-    enabled: bool,
+    pub enabled: bool,
     api_key: Option<String>,
 }
 
