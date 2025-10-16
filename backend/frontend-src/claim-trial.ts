@@ -1,48 +1,60 @@
-"use strict";
-(() => {
-  // frontend-src/claim-trial.ts
-  var API_BASE = window.location.origin;
-  var token = localStorage.getItem("token");
-  if (!token) {
-    window.location.href = "/signup";
-  }
-  async function claimPlan(planType) {
-    const messageBox = document.getElementById("message");
-    messageBox.classList.remove("show", "success", "error");
+const API_BASE = window.location.origin;
+
+// Check authentication
+const token = localStorage.getItem('token');
+if (!token) {
+    window.location.href = '/signup';
+}
+
+async function claimPlan(planType: string): Promise<void> {
+    const messageBox = document.getElementById('message')!;
+    messageBox.classList.remove('show', 'success', 'error');
+    
     try {
-      const response = await fetch(`${API_BASE}/api/user/claim-plan`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ plan: planType })
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to claim plan");
-      }
-      localStorage.setItem("user_plan", planType);
-      localStorage.setItem("plan_expires", data.expires_at);
-      messageBox.textContent = `\u2713 ${planType === "trial" ? "Free trial" : "Pro plan"} activated! Redirecting to dashboard...`;
-      messageBox.classList.add("show", "success");
-      setTimeout(() => {
-        showConnectionInstructions(data);
-      }, 1500);
+        const response = await fetch(`${API_BASE}/api/user/claim-plan`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ plan: planType })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to claim plan');
+        }
+        
+        // Store plan info
+        localStorage.setItem('user_plan', planType);
+        localStorage.setItem('plan_expires', data.expires_at);
+        
+        // Show success message
+        messageBox.textContent = `✓ ${planType === 'trial' ? 'Free trial' : 'Pro plan'} activated! Redirecting to dashboard...`;
+        messageBox.classList.add('show', 'success');
+        
+        // Show connection instructions modal
+        setTimeout(() => {
+            showConnectionInstructions(data);
+        }, 1500);
+        
     } catch (error) {
-      messageBox.textContent = error.message || "An error occurred. Please try again.";
-      messageBox.classList.add("show", "error");
+        messageBox.textContent = (error as Error).message || 'An error occurred. Please try again.';
+        messageBox.classList.add('show', 'error');
     }
-  }
-  function showConnectionInstructions(data) {
-    const email = localStorage.getItem("user_email");
-    const password = "(your password)";
-    const modal = document.createElement("div");
-    modal.className = "connection-modal";
+}
+
+function showConnectionInstructions(data: any): void {
+    const email = localStorage.getItem('user_email');
+    const password = '(your password)'; // Don't store password in localStorage
+    
+    const modal = document.createElement('div');
+    modal.className = 'connection-modal';
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h2>\u{1F389} Welcome to Bore!</h2>
+                <h2>🎉 Welcome to Bore!</h2>
                 <button class="close-btn" onclick="closeModal()">&times;</button>
             </div>
             
@@ -84,7 +96,7 @@
             </ol>
             
             <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin-top: 24px;">
-                <strong style="color: #10b981;">\u{1F4A1} Pro Tip:</strong>
+                <strong style="color: #10b981;">💡 Pro Tip:</strong>
                 <p style="margin-top: 8px; font-size: 14px; color: #059669;">
                     Your credentials are stored securely. You only need to login once, 
                     and all future tunnel connections will authenticate automatically!
@@ -92,20 +104,23 @@
             </div>
         </div>
     `;
+    
     document.body.appendChild(modal);
-  }
-  function closeModal() {
-    const modal = document.querySelector(".connection-modal");
+}
+
+function closeModal(): void {
+    const modal = document.querySelector('.connection-modal');
     if (modal) {
-      modal.remove();
+        modal.remove();
     }
     goToDashboard();
-  }
-  function goToDashboard() {
-    window.location.href = "/dashboard";
-  }
-  window.claimPlan = claimPlan;
-  window.closeModal = closeModal;
-  window.goToDashboard = goToDashboard;
-})();
-//# sourceMappingURL=claim-trial.js.map
+}
+
+function goToDashboard(): void {
+    window.location.href = '/dashboard';
+}
+
+// Make functions global
+(window as any).claimPlan = claimPlan;
+(window as any).closeModal = closeModal;
+(window as any).goToDashboard = goToDashboard;

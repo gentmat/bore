@@ -1,0 +1,15 @@
+/**
+ * Jest After Environment Setup
+ * Runs after environment is set up but before tests
+ */
+
+import { clearTestData } from './setup';
+
+// Set test base URL from global
+const TEST_PORT = (global as any).__TEST_PORT__ || 3001;
+(global as any).TEST_BASE_URL = `http://localhost:${TEST_PORT}`;
+
+// Clear test data before each test file
+beforeAll(async () => {
+  await clearTestData();
+});
