@@ -25,24 +25,28 @@ interface MigrationConfig {
 }
 
 // Parse DATABASE_URL if available, otherwise use individual variables
-// In CI environments, prioritize individual environment variables over DATABASE_URL
+// In CI environments, completely ignore DATABASE_URL and only use explicit variables
 const getDatabaseConfig = () => {
   const databaseUrl = process.env.DATABASE_URL;
   const isCI = process.env.CI === 'true';
 
-  // In CI, always use explicit environment variables and ignore DATABASE_URL completely
+  // In CI, ALWAYS use explicit environment variables and completely ignore DATABASE_URL
   if (isCI) {
-    return {
+    console.log('🔧 CI Environment: Using explicit DB_* variables, ignoring DATABASE_URL');
+    const config = {
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432', 10),
       database: process.env.DB_NAME || 'bore_db',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
     };
+    console.log('🔧 CI DB Config:', { ...config, password: '***' });
+    return config;
   }
 
   // In non-CI, use DATABASE_URL if available
   if (databaseUrl) {
+    console.log('🔧 Non-CI Environment: Using DATABASE_URL');
     // Parse DATABASE_URL: postgresql://user:password@host:port/database
     const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
     if (match) {
@@ -57,6 +61,7 @@ const getDatabaseConfig = () => {
   }
 
   // Fallback to individual environment variables
+  console.log('🔧 Fallback: Using individual DB_* variables');
   return {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
