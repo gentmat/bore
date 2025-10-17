@@ -204,3 +204,4 @@ fn cleanup_tunnels(app_handle: &tauri::AppHandle) {
     
     tracing::info!("All tunnels stopped successfully");
 }
+// GUI workflow trigger
