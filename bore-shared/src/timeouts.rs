@@ -16,7 +16,7 @@ pub const BACKEND_HTTP_TIMEOUT: Duration = Duration::from_secs(5);
 /// This is the maximum time a client will wait for the server to respond
 /// during the initial handshake and authentication.
 ///
-/// CRITICAL CONSTRAINT: This MUST be greater than BACKEND_HTTP_TIMEOUT
+/// CRITICAL CONSTRAINT: This MUST be greater than `BACKEND_HTTP_TIMEOUT`
 /// to allow the server sufficient time to complete backend validation.
 pub const NETWORK_TIMEOUT: Duration = Duration::from_secs(10);
 
