@@ -43,7 +43,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     scopes: {
       type: 'text[]',
       notNull: true,
-      default: "'{}'",
+      default: '{}',
       comment: 'Permissions granted to this key',
     },
     last_used_at: {
