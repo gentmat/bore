@@ -40,7 +40,7 @@ async function startTestServer(port: number = 3001): Promise<ServerInfo> {
   process.env.DB_NAME = process.env.TEST_DB_NAME || 'bore_db_test';
   
   // Suppress logs during tests
-  logger.level = 'error';
+  // logger.level = 'error'; // Logger level is not directly settable
 
   try {
     // Initialize database
@@ -60,7 +60,7 @@ async function startTestServer(port: number = 3001): Promise<ServerInfo> {
     app.use('/api/v1/internal', internalRoutes);
 
     // Health check
-    app.get('/health', (req, res) => {
+    app.get('/health', (_req, res) => {
       res.json({ status: 'healthy', test: true });
     });
 
@@ -92,7 +92,7 @@ async function startTestServer(port: number = 3001): Promise<ServerInfo> {
 
     return { server, app, port };
   } catch (error) {
-    logger.error('Failed to start test server:', error);
+    logger.error('Failed to start test server:', error as Error);
     throw error;
   }
 }
@@ -117,7 +117,7 @@ async function stopTestServer(): Promise<void> {
     serverStarted = false;
     logger.info('Test server stopped');
   } catch (error) {
-    logger.error('Failed to stop test server:', error);
+    logger.error('Failed to stop test server:', error as Error);
     throw error;
   }
 }

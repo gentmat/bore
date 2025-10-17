@@ -23,7 +23,7 @@ interface TestUser {
 
 let authToken: string;
 let instanceId: string;
-let testUser: TestUser = {
+const testUser: TestUser = {
   email: `test-instance-${Date.now()}@example.com`,
   password: 'SecurePass123!',
   name: 'Instance Test User',

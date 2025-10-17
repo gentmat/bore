@@ -6,7 +6,7 @@
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import { ExpressInstrumentation, ExpressLayerType } from '@opentelemetry/instrumentation-express';
+import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { RedisInstrumentation } from '@opentelemetry/instrumentation-redis-4';
 import { Resource } from '@opentelemetry/resources';
@@ -52,7 +52,6 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
       // Jaeger exporter for production
       exporter = new JaegerExporter({
         endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
-        serviceName,
       });
       logger.info(`🔍 Tracing to Jaeger: ${process.env.JAEGER_ENDPOINT || 'http://localhost:14268'}`);
     } else {
@@ -142,7 +141,7 @@ async function traceFunction<T>(
 /**
  * Middleware to add trace context to logs
  */
-function traceContextMiddleware(req: RequestWithTrace, res: Response, next: NextFunction): void {
+function traceContextMiddleware(req: RequestWithTrace, _res: Response, next: NextFunction): void {
   try {
     const span = trace.getSpan(context.active());
     
@@ -166,7 +165,7 @@ async function shutdownTracing(provider: NodeTracerProvider | null): Promise<voi
       await provider.shutdown();
       logger.info('✅ Tracing shutdown complete');
     } catch (error) {
-      logger.error('Failed to shutdown tracing', error);
+      logger.error('Failed to shutdown tracing', error as Error);
     }
   }
 }

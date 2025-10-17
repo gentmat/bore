@@ -4,7 +4,7 @@
 
 import { Pool, PoolClient } from 'pg';
 import config from '../../config';
-import { generateTestUsers, generateTestInstances, generateTestServers, TestUser, TestInstance, TestServer } from './seed-data';
+import { generateTestUsers, generateTestInstances, generateTestServers } from './seed-data';
 
 interface SeedResult {
   users: any[];

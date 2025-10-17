@@ -177,22 +177,22 @@ impl Server {
                     Some((_, mut stream2)) => {
                         // stream = bore client connection (just received Accept message)
                         // stream2 = external client connection (waiting to be forwarded)
-                        
+
                         // Extract underlying TCP stream from the framed codec
                         let mut parts = stream.into_parts();
                         debug_assert!(parts.write_buf.is_empty(), "framed write buffer not empty");
-                        
+
                         // Forward any buffered data from bore client to external client
                         // Usually empty, but handles edge cases where data arrives before Accept
                         stream2.write_all(&parts.read_buf).await?;
-                        
+
                         // Begin bidirectional forwarding: external client ↔ bore client ↔ local service
                         tokio::io::copy_bidirectional(&mut parts.io, &mut stream2).await?;
                     }
                     None => {
                         // Connection ID not found - likely timed out or already handled
                         warn!(%id, "missing connection")
-                    },
+                    }
                 }
                 return Ok(());
             }
@@ -203,9 +203,12 @@ impl Server {
                 // returns automatic success.
                 if !self.backend.enabled && self.auth.is_some() {
                     warn!("Rejecting Authenticate message in legacy shared-secret mode");
-                    stream.send(ServerMessage::Error(
-                        "Authentication method not supported. Use shared secret mode.".to_string()
-                    )).await?;
+                    stream
+                        .send(ServerMessage::Error(
+                            "Authentication method not supported. Use shared secret mode."
+                                .to_string(),
+                        ))
+                        .await?;
                     return Ok(());
                 }
 
@@ -254,12 +257,15 @@ impl Server {
                         "Backend returned valid=true but missing user_id. This is a backend bug. \
                         Rejecting connection to prevent undefined behavior."
                     );
-                    stream.send(ServerMessage::Error(
-                        "Authentication service returned invalid data. Please contact support.".to_string()
-                    )).await?;
+                    stream
+                        .send(ServerMessage::Error(
+                            "Authentication service returned invalid data. Please contact support."
+                                .to_string(),
+                        ))
+                        .await?;
                     return Ok(());
                 };
-                
+
                 user_id = validated_user_id;
                 max_tunnels = validation.max_concurrent_tunnels.unwrap_or(5);
 
@@ -290,16 +296,18 @@ impl Server {
             }
             Some(ClientMessage::Hello(port)) => {
                 // Client sent Hello without Authenticate - check if this is allowed
-                
+
                 // If backend is enabled, reject unauthenticated Hello
                 if self.backend.enabled && self.auth.is_none() {
                     warn!("Rejecting unauthenticated Hello - backend auth required");
-                    stream.send(ServerMessage::Error(
-                        "Authentication required. Please provide a valid API key.".to_string()
-                    )).await?;
+                    stream
+                        .send(ServerMessage::Error(
+                            "Authentication required. Please provide a valid API key.".to_string(),
+                        ))
+                        .await?;
                     return Ok(());
                 }
-                
+
                 // Legacy mode: using shared secret or no auth
                 if let Some(auth) = &self.auth {
                     // Send challenge and validate
@@ -391,7 +399,7 @@ impl Server {
                 }
             }
         };
-        
+
         if !limit_ok {
             stream.send(ServerMessage::Error(format!(
                 "Maximum concurrent tunnels ({}) reached. Please disconnect an existing tunnel or upgrade your plan.",
@@ -399,7 +407,7 @@ impl Server {
             ))).await?;
             return Ok(());
         }
-        
+
         // Create listener
         let listener = match self.create_listener(requested_port).await {
             Ok(listener) => listener,
@@ -436,7 +444,12 @@ impl Server {
         let server_id_clone = self.server_id.clone();
         let session_id_handle = tokio::spawn(async move {
             match backend_clone
-                .log_tunnel_start(&user_id_clone, public_port, requested_port, &server_id_clone)
+                .log_tunnel_start(
+                    &user_id_clone,
+                    public_port,
+                    requested_port,
+                    &server_id_clone,
+                )
                 .await
             {
                 Ok(id) => id,
@@ -539,7 +552,7 @@ impl Server {
 
                 // Store the external client connection temporarily
                 conns.insert(id, stream2);
-                
+
                 // Spawn a cleanup task to prevent memory leaks from unaccepted connections
                 // If the bore client doesn't send Accept(id) within 10 seconds, we remove
                 // the stored connection. This handles cases where:
@@ -552,7 +565,7 @@ impl Server {
                         warn!(%id, "removed stale connection");
                     }
                 });
-                
+
                 // Notify bore client of the new connection
                 stream.send(ServerMessage::Connection(id)).await?;
             }

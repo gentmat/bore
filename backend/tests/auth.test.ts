@@ -51,7 +51,9 @@ jest.mock('../config', () => ({
   }
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { db } = require('../database');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { createRefreshToken } = require('../middleware/refresh-token');
 
 // Create test app
@@ -135,6 +137,7 @@ describe('Auth Routes', () => {
 
   describe('POST /api/v1/auth/login', () => {
     it('should login successfully with correct credentials', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const bcrypt = require('bcryptjs');
       const mockUser = {
         id: 'user_123',
@@ -197,6 +200,7 @@ describe('Auth Routes', () => {
 
   describe('POST /api/v1/auth/refresh', () => {
     it('should refresh token successfully', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { validateRefreshToken, revokeRefreshToken } = require('../middleware/refresh-token');
       const mockUser = {
         id: 'user_123',
@@ -224,6 +228,7 @@ describe('Auth Routes', () => {
     });
 
     it('should return 401 for invalid refresh token', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { validateRefreshToken } = require('../middleware/refresh-token');
       validateRefreshToken.mockResolvedValue(null);
 

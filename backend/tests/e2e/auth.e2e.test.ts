@@ -14,7 +14,7 @@ interface TestUser {
   name: string;
 }
 
-let testUser: TestUser = {
+const testUser: TestUser = {
   email: `test-e2e-${Date.now()}@example.com`,
   password: 'SecurePass123!',
   name: 'E2E Test User',

@@ -28,6 +28,7 @@ import { cleanupExpiredTokens } from './middleware/refresh-token';
 import authRoutes from './routes/auth-routes';
 import { router as instanceRoutes, instanceHeartbeats } from './routes/instance-routes';
 import internalRoutes from './routes/internal-routes';
+import { swaggerUi, swaggerDocument, swaggerOptions } from './swagger';
 
 const app: Application = express();
 const server = http.createServer(app);
@@ -233,7 +234,6 @@ app.get('/api/v1/events/status', authenticateJWT, (req: Request, res: Response) 
 });
 
 // API Documentation (Swagger) - MANDATORY
-const { swaggerUi, swaggerDocument, swaggerOptions } = require('./swagger');
 app.use('/api/v1/docs', swaggerUi.serve);
 app.get('/api/v1/docs', swaggerUi.setup(swaggerDocument, swaggerOptions));
 logger.info('📚 API Documentation available at /api/v1/docs');

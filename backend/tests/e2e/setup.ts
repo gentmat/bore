@@ -3,7 +3,7 @@
  * Global setup for end-to-end tests
  */
 
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import config from '../../config';
 
 // Test database pool

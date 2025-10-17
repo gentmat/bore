@@ -10,6 +10,7 @@ import { ErrorResponses } from '../utils/error-handler';
 import redisService from '../services/redis-service';
 import { requireCapacity } from '../capacity-limiter';
 import { logger } from '../utils/logger';
+import { getBestServer } from '../server-registry';
 
 const router: Router = express.Router();
 
@@ -293,7 +294,6 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request,
     }
     
     // LOAD BALANCING: Get least loaded bore-server
-    const { getBestServer } = require('../server-registry');
     const bestServer = await getBestServer();
     
     if (!bestServer) {
@@ -338,7 +338,7 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request,
       expiresAt: expiresAt.toISOString(),
       serverInfo: {
         serverId: bestServer.id,
-        utilization: bestServer.overallUtilization?.toFixed(1) + '%'
+        utilization: ((bestServer.currentLoad / bestServer.maxConcurrentTunnels) * 100).toFixed(1) + '%'
       }
     });
   } catch (error) {

@@ -56,7 +56,7 @@ impl Client {
         // Determine authentication mode based on secret format:
         // - API keys start with "sk_" or "tk_" (tunnel token prefix)
         // - Everything else uses legacy HMAC challenge-response
-        // 
+        //
         // CRITICAL: Do NOT use 64-char hex heuristic! Many legacy deployments use
         // openssl rand -hex 32, which produces 64-char hex but expects HMAC flow.
         // Misdetecting these as "modern" breaks authentication completely.
@@ -91,7 +91,7 @@ impl Client {
 
         // Receive response - may be Hello or Challenge
         let first_response = stream.recv_timeout().await?;
-        
+
         let remote_port = match first_response {
             Some(ServerMessage::Challenge(challenge)) => {
                 // Server sent a challenge - we need to authenticate
@@ -101,7 +101,7 @@ impl Client {
                     info!("Received challenge, performing HMAC response");
                     let tag = authenticator.answer(&challenge);
                     stream.send(ClientMessage::Authenticate(tag)).await?;
-                    
+
                     // Now wait for the Hello message after successful auth
                     match stream.recv_timeout().await? {
                         Some(ServerMessage::Hello(remote_port)) => remote_port,

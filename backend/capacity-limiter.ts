@@ -10,8 +10,6 @@ import { logger } from './utils/logger';
 
 // Import types to avoid circular dependency issues
 import type { FleetStats } from './server-registry';
-// Import at runtime
-const serverRegistry = require('./server-registry');
 
 // Configuration from environment variables
 const CAPACITY_CONFIG = config.capacity;
@@ -92,7 +90,8 @@ interface ServerInfo {
 export async function checkSystemCapacity(): Promise<SystemCapacityCheck> {
   try {
     // Get real-time fleet statistics
-    const fleetStats: FleetStats = await serverRegistry.getFleetStats();
+    const { getFleetStats } = await import('./server-registry');
+    const fleetStats: FleetStats = await getFleetStats();
     
     // If we have active servers, use their reported capacity
     if (fleetStats.serverCount > 0) {
@@ -303,7 +302,8 @@ export async function requireCapacity(req: Request, res: Response, next: NextFun
  */
 export async function getCapacityStats(): Promise<CapacityStats> {
   const systemCheck = await checkSystemCapacity();
-  const fleetStats: FleetStats = await serverRegistry.getFleetStats();
+  const { getFleetStats } = await import('./server-registry');
+  const fleetStats: FleetStats = await getFleetStats();
   
   return {
     system: systemCheck,
@@ -349,7 +349,8 @@ function generateCapacityAlerts(capacityInfo: SystemCapacityCheck): CapacityAler
  */
 export async function getServerLoads(): Promise<any[]> {
   try {
-    const fleetStats: FleetStats = await serverRegistry.getFleetStats();
+    const { getFleetStats } = await import('./server-registry');
+    const fleetStats: FleetStats = await getFleetStats();
     return fleetStats.servers || [];
   } catch (error) {
     logger.error('Failed to get server loads', error as Error);

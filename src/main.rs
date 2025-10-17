@@ -55,6 +55,10 @@ enum Command {
         #[clap(long, env = "BORE_BACKEND_URL")]
         backend_url: Option<String>,
 
+        /// Backend API key for internal server-to-server authentication.
+        #[clap(long, env = "BORE_BACKEND_API_KEY", hide_env_values = true)]
+        backend_api_key: Option<String>,
+
         /// Server ID for multi-server deployments (used in usage tracking).
         #[clap(long, env = "BORE_SERVER_ID", default_value = "default")]
         server_id: String,
@@ -86,6 +90,7 @@ async fn run(command: Command) -> Result<()> {
             max_port,
             secret,
             backend_url,
+            backend_api_key,
             server_id,
             bind_addr,
             bind_tunnels,
@@ -100,6 +105,7 @@ async fn run(command: Command) -> Result<()> {
                 port_range,
                 secret.as_deref(),
                 backend_url,
+                backend_api_key,
                 server_id,
             );
             server.set_bind_addr(bind_addr);

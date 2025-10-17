@@ -65,18 +65,19 @@ const config: LoadTestConfig = {
 
 // Parse command line arguments
 process.argv.slice(2).forEach((arg, i, args) => {
+  const nextArg = args[i + 1];
   switch(arg) {
     case '--users':
-      config.users = parseInt(args[i + 1]);
+      if (nextArg) config.users = parseInt(nextArg);
       break;
     case '--duration':
-      config.duration = parseInt(args[i + 1]);
+      if (nextArg) config.duration = parseInt(nextArg);
       break;
     case '--ramp-up':
-      config.rampUp = parseInt(args[i + 1]);
+      if (nextArg) config.rampUp = parseInt(nextArg);
       break;
     case '--target':
-      config.target = args[i + 1];
+      if (nextArg) config.target = nextArg;
       break;
   }
 });
@@ -119,12 +120,12 @@ function makeRequest(method: string, path: string, body: any = null, token: stri
     };
 
     if (token) {
-      options.headers!['Authorization'] = `Bearer ${token}`;
+      (options.headers as Record<string, string | number>)['Authorization'] = `Bearer ${token}`;
     }
 
     if (body) {
       const bodyStr = JSON.stringify(body);
-      options.headers!['Content-Length'] = Buffer.byteLength(bodyStr);
+      (options.headers as Record<string, string | number>)['Content-Length'] = Buffer.byteLength(bodyStr);
     }
 
     const startTime = performance.now();

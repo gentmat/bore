@@ -141,20 +141,21 @@ class CircuitBreaker {
    * Execute function with timeout
    */
   private async _executeWithTimeout<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise<T>(async (resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.stats.timeouts++;
         reject(new Error(`Operation timed out after ${this.timeout}ms`));
       }, this.timeout);
 
-      try {
-        const result = await fn();
-        clearTimeout(timer);
-        resolve(result);
-      } catch (error) {
-        clearTimeout(timer);
-        reject(error);
-      }
+      fn()
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
     });
   }
 

@@ -9,7 +9,8 @@ import {
   getBestServer,
   updateServerLoad,
   markServerUnhealthy,
-  getFleetStats
+  getFleetStats,
+  servers
 } from '../server-registry';
 import { db } from '../database';
 import * as redisService from '../services/redis-service';
@@ -104,7 +105,6 @@ describe('Server Registry', () => {
     });
 
     it('should filter inactive servers', async () => {
-      const { servers } = require('../server-registry');
       servers.clear();
       
       servers.set('server_1', {
@@ -127,7 +127,6 @@ describe('Server Registry', () => {
 
   describe('getBestServer', () => {
     beforeEach(async () => {
-      const { servers } = require('../server-registry');
       servers.clear();
       (mockDb.query as jest.Mock).mockResolvedValue({});
     });
@@ -157,7 +156,6 @@ describe('Server Registry', () => {
     });
 
     it('should return null when no servers available', async () => {
-      const { servers } = require('../server-registry');
       servers.clear();
 
       const best = await getBestServer();
@@ -184,7 +182,6 @@ describe('Server Registry', () => {
 
   describe('updateServerLoad', () => {
     it('should update server metrics', async () => {
-      const { servers } = require('../server-registry');
       (mockDb.query as jest.Mock).mockResolvedValue({});
       
       await registerServer({
@@ -219,7 +216,6 @@ describe('Server Registry', () => {
 
   describe('markServerUnhealthy', () => {
     it('should mark server as unhealthy', async () => {
-      const { servers } = require('../server-registry');
       (mockDb.query as jest.Mock).mockResolvedValue({});
       
       await registerServer({
@@ -240,7 +236,6 @@ describe('Server Registry', () => {
 
   describe('getFleetStats', () => {
     beforeEach(async () => {
-      const { servers } = require('../server-registry');
       servers.clear();
       (mockDb.query as jest.Mock).mockResolvedValue({});
     });
@@ -273,7 +268,6 @@ describe('Server Registry', () => {
     });
 
     it('should handle empty fleet', async () => {
-      const { servers } = require('../server-registry');
       servers.clear();
 
       const stats = await getFleetStats();

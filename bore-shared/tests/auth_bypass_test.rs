@@ -1,5 +1,5 @@
 /// Regression test for authentication bypass vulnerability
-/// 
+///
 /// CVE: High-severity auth bypass where clients could send ClientMessage::Authenticate
 /// with arbitrary strings in legacy shared-secret mode and bypass HMAC validation.
 ///
@@ -9,10 +9,10 @@
 ///
 /// Fix: Server now rejects Authenticate messages when backend is disabled and
 /// legacy auth is configured, forcing proper Hello → Challenge → Response flow.
-
 use anyhow::Result;
 use bore_server::Server;
 use bore_shared::{ClientMessage, Delimited, ServerMessage, CONTROL_PORT};
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::time;
@@ -21,7 +21,11 @@ use tokio::time;
 async fn test_auth_bypass_prevention() -> Result<()> {
     // Start server with legacy shared secret (backend disabled)
     let secret = "my-secret-123";
-    tokio::spawn(Server::new(1024..=65535, Some(secret), None, None, "test".to_string()).listen());
+    let mut server = Server::new(1024..=65535, Some(secret), None, None, "test".to_string());
+    // Explicitly bind to loopback for constrained environments
+    server.set_bind_addr(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    server.set_bind_tunnels(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    tokio::spawn(server.listen());
     time::sleep(Duration::from_millis(50)).await;
 
     // Attempt 1: Try to bypass auth with Authenticate message
@@ -56,12 +60,15 @@ async fn test_auth_bypass_prevention() -> Result<()> {
             panic!("Unexpected Challenge after Authenticate message");
         }
         Ok(other) => {
-            panic!("Unexpected response to Authenticate bypass attempt: {:?}", other);
+            panic!(
+                "Unexpected response to Authenticate bypass attempt: {:?}",
+                other
+            );
         }
     }
 
     // Main security test passed! The Authenticate bypass is prevented.
-    // 
+    //
     // Note: We don't test the full Challenge-Response flow here because:
     // 1. That's covered by other e2e tests (mismatched_secret, basic_proxy)
     // 2. The critical security issue is the bypass, which we've verified is fixed

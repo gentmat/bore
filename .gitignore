@@ -2,6 +2,9 @@
 /target
 /bore-gui/src-tauri/target
 
+# Legacy monolithic codebase (deprecated - use workspace packages)
+/src
+
 # Release bundles
 /bore-gui/release
 /bore-gui/src-tauri/target/release/bundle

@@ -25,5 +25,5 @@ uuid.workspace = true
 [dev-dependencies]
 bore-client = { path = "../bore-client" }
 bore-server = { path = "../bore-server" }
-lazy_static = "1.4"
-rstest = "0.18"
+lazy_static.workspace = true
+rstest.workspace = true
