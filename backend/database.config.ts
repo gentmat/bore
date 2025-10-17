@@ -30,15 +30,32 @@ const getDatabaseConfig = () => {
   const databaseUrl = process.env.DATABASE_URL;
   const isCI = process.env.CI === 'true';
 
-  // In CI, prioritize explicit environment variables
+  // Debug logging for CI environments
   if (isCI) {
-    return {
+    console.log('CI Environment Detected:');
+    console.log('DATABASE_URL:', databaseUrl);
+    console.log('DB_HOST:', process.env.DB_HOST);
+    console.log('DB_USER:', process.env.DB_USER);
+    console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+    console.log('DB_NAME:', process.env.DB_NAME);
+    console.log('DB_PORT:', process.env.DB_PORT);
+  }
+
+  // In CI, always use explicit environment variables and ignore DATABASE_URL completely
+  if (isCI) {
+    const config = {
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432', 10),
       database: process.env.DB_NAME || 'bore_db',
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
     };
+
+    if (isCI) {
+      console.log('Final CI Config:', config);
+    }
+
+    return config;
   }
 
   // In non-CI, use DATABASE_URL if available
