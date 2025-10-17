@@ -25,9 +25,23 @@ interface MigrationConfig {
 }
 
 // Parse DATABASE_URL if available, otherwise use individual variables
+// In CI environments, prioritize individual environment variables over DATABASE_URL
 const getDatabaseConfig = () => {
   const databaseUrl = process.env.DATABASE_URL;
+  const isCI = process.env.CI === 'true';
 
+  // In CI, prioritize explicit environment variables
+  if (isCI) {
+    return {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      database: process.env.DB_NAME || 'bore_db',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+    };
+  }
+
+  // In non-CI, use DATABASE_URL if available
   if (databaseUrl) {
     // Parse DATABASE_URL: postgresql://user:password@host:port/database
     const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
