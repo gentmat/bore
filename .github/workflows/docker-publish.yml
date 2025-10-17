@@ -105,13 +105,26 @@ jobs:
       - name: Create Dockerfile for ${{ matrix.component }}
         run: |
           cat > Dockerfile.${{ matrix.component }} << 'EOF'
-          FROM rust:1.75-slim as builder
+          FROM rust:1.81-slim as builder
+          
+          RUN apt-get update && apt-get install -y \
+              pkg-config \
+              libssl-dev \
+              && rm -rf /var/lib/apt/lists/*
+          
           WORKDIR /app
-          COPY . .
+          COPY Cargo.toml Cargo.lock ./
+          COPY bore-shared ./bore-shared/
+          COPY bore-server ./bore-server/
+          COPY bore-client ./bore-client/
+          
           RUN cargo build --release -p ${{ matrix.component }}
 
           FROM debian:bookworm-slim
-          RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+          RUN apt-get update && apt-get install -y \
+              ca-certificates \
+              libssl3 \
+              && rm -rf /var/lib/apt/lists/*
           COPY --from=builder /app/target/release/${{ matrix.component }} /usr/local/bin/
           ENTRYPOINT ["${{ matrix.component }}"]
           EOF
