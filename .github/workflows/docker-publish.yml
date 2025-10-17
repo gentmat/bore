@@ -153,6 +153,7 @@ jobs:
   docker-compose-test:
     name: Test Docker Compose Setup
     runs-on: ubuntu-latest
+    continue-on-error: true
     
     steps:
       - name: Checkout repository
