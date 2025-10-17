@@ -1,5 +1,5 @@
 # Multi-stage build for bore-server
-FROM rust:1.81-slim as builder
+FROM rust:1.82-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
