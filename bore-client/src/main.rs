@@ -397,3 +397,4 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     run(Args::parse())
 }
+// Trigger Rust CI workflow
