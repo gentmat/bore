@@ -1,6 +1,7 @@
 //! Backend API client for user authentication and usage tracking.
 
 use anyhow::{anyhow, Context, Error, Result};
+use bore_shared::timeouts::BACKEND_HTTP_TIMEOUT;
 use reqwest::{Client, Method, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -92,8 +93,16 @@ impl BackendClient {
             None => (String::new(), false),
         };
 
+        // Backend HTTP client timeout
+        //
+        // IMPORTANT: This timeout must be LESS than NETWORK_TIMEOUT (10s) in
+        // bore-shared/src/protocol.rs:27 to prevent client timeouts during
+        // authentication. The client waits for server response, but the server
+        // must complete this HTTP call first.
+        //
+        // Current relationship: NETWORK_TIMEOUT (10s) > backend timeout (BACKEND_HTTP_TIMEOUT) ✓
         let http_client = Client::builder()
-            .timeout(Duration::from_secs(5))
+            .timeout(BACKEND_HTTP_TIMEOUT)
             .build()
             .expect("Failed to create HTTP client");
 

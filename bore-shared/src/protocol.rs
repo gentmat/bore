@@ -1,7 +1,5 @@
 //! Shared data structures, utilities, and protocol definitions.
 
-use std::time::Duration;
-
 use anyhow::{Context, Result};
 use futures_util::{SinkExt, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -17,8 +15,8 @@ pub const CONTROL_PORT: u16 = 7835;
 /// Maximum byte length for a JSON frame in the stream.
 pub const MAX_FRAME_LENGTH: usize = 256;
 
-/// Timeout for network connections and initial protocol messages.
-pub const NETWORK_TIMEOUT: Duration = Duration::from_secs(3);
+// Re-export timeout constants from the centralized timeouts module
+pub use crate::timeouts::NETWORK_TIMEOUT;
 
 /// A message from the client on the control connection.
 #[derive(Debug, Serialize, Deserialize)]

@@ -8,9 +8,11 @@
 
 pub mod auth;
 pub mod protocol;
+pub mod timeouts;
 
 // Re-export commonly used items
 pub use auth::Authenticator;
 pub use protocol::{
     ClientMessage, Delimited, ServerMessage, CONTROL_PORT, MAX_FRAME_LENGTH, NETWORK_TIMEOUT,
 };
+pub use timeouts::{BACKEND_HTTP_TIMEOUT, NETWORK_TIMEOUT as CLIENT_NETWORK_TIMEOUT};
