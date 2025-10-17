@@ -3,8 +3,12 @@
  * Configuration for database migrations
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+// Only load dotenv in non-CI environments
+if (!process.env.CI) {
+  import('dotenv').then(dotenv => {
+    dotenv.config();
+  });
+}
 
 interface MigrationConfig {
   host: string;
@@ -22,12 +26,11 @@ interface MigrationConfig {
 
 const migrationConfig: MigrationConfig = {
   // Database connection settings
-  // In CI/CD, prioritize CI environment variables over .env file
-  host: process.env.CI ? 'localhost' : (process.env.DB_HOST || 'localhost'),
-  port: parseInt(process.env.CI ? '5432' : (process.env.DB_PORT || '5432'), 10),
-  database: process.env.CI ? 'bore_test' : (process.env.DB_NAME || 'bore_db'),
-  user: process.env.CI ? 'postgres' : (process.env.DB_USER || 'postgres'),
-  password: process.env.CI ? 'postgres' : (process.env.DB_PASSWORD || 'postgres'),
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432', 10),
+  database: process.env.DB_NAME || 'bore_db',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
   
   // Migration settings
   dir: 'migrations',
