@@ -15,12 +15,26 @@ help:
 	@echo "  make test               - Run all unit tests"
 	@echo "  make test-rust          - Run Rust tests only"
 	@echo "  make test-backend       - Run backend tests only"
-	@echo "  make integration-tests  - Run integration tests (requires servers)"
+	@echo "  make integration-tests  - Run integration tests (full tunnel flow)"
+	@echo "  make performance-tests  - Run performance benchmarks and regression tests"
 	@echo ""
 	@echo "Development:"
 	@echo "  make install            - Install all dependencies"
 	@echo "  make build              - Build all components"
 	@echo "  make clean              - Clean build artifacts"
+	@echo ""
+	@echo "Monitoring:"
+	@echo "  make monitoring-setup   - Setup Prometheus & Grafana with dashboards"
+	@echo "  make monitoring-up      - Start monitoring services"
+	@echo "  make monitoring-down    - Stop monitoring services"
+	@echo "  make monitoring-logs    - Show monitoring logs"
+	@echo "  make monitoring-status  - Check monitoring service health"
+	@echo ""
+	@echo "Kubernetes:"
+	@echo "  make k8s-deploy         - Deploy to Kubernetes (development)"
+	@echo "  make k8s-deploy-prod    - Deploy to Kubernetes (production)"
+	@echo "  make k8s-status         - Show Kubernetes deployment status"
+	@echo "  make k8s-cleanup        - Clean Kubernetes deployment"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-build       - Build Docker images"
@@ -130,6 +144,29 @@ docker-down:
 	@echo "🐳 Stopping Docker services..."
 	docker-compose down
 
+# Monitoring
+monitoring-setup:
+	@echo "📊 Setting up monitoring stack..."
+	cd backend && ./scripts/setup-monitoring.sh
+
+monitoring-up:
+	@echo "📊 Starting monitoring services..."
+	cd backend && docker-compose --profile monitoring up -d
+
+monitoring-down:
+	@echo "📊 Stopping monitoring services..."
+	cd backend && docker-compose --profile monitoring down
+
+monitoring-logs:
+	@echo "📊 Showing monitoring logs..."
+	cd backend && docker-compose logs -f prometheus grafana
+
+monitoring-status:
+	@echo "📊 Checking monitoring services..."
+	@echo "Backend Health:" && curl -s http://localhost:3000/health | jq . || echo "❌ Backend unreachable"
+	@echo "Prometheus Health:" && curl -s http://localhost:9090/-/healthy || echo "❌ Prometheus unreachable"
+	@echo "Grafana Health:" && curl -s http://localhost:3001/api/health || echo "❌ Grafana unreachable"
+
 docker-logs:
 	@echo "📋 Showing Docker logs..."
 	docker-compose logs -f
@@ -147,8 +184,43 @@ watch:
 	@echo "👀 Watching for changes..."
 	cargo watch -x check -x test
 
+# Integration Tests
+integration-tests:
+	@echo "🔗 Running integration tests..."
+	./tests/run_integration_tests.sh
+
+# Performance Tests
+performance-tests:
+	@echo "📊 Running performance benchmarks..."
+	./tests/run_performance_tests.sh --all
+
+# Kubernetes Deployment
+k8s-deploy:
+	@echo "🚀 Deploying to Kubernetes (development)..."
+	./k8s/deploy.sh deploy -e development
+
+k8s-deploy-prod:
+	@echo "🚀 Deploying to Kubernetes (production)..."
+	./k8s/deploy.sh deploy -e production --push-images
+
+k8s-status:
+	@echo "📋 Kubernetes deployment status..."
+	./k8s/deploy.sh status -e development
+
+k8s-status-prod:
+	@echo "📋 Kubernetes production status..."
+	./k8s/deploy.sh status -e production
+
+k8s-cleanup:
+	@echo "🧹 Cleaning Kubernetes deployment..."
+	./k8s/deploy.sh cleanup -e development --force-cleanup
+
+k8s-cleanup-prod:
+	@echo "🧹 Cleaning Kubernetes production deployment..."
+	./k8s/deploy.sh cleanup -e production
+
 # CI/CD Simulation
-ci-check: format-check lint audit test
+ci-check: format-check lint audit test integration-tests performance-tests
 	@echo "✅ All CI checks passed!"
 
 pre-commit: format lint test-rust

@@ -1,0 +1,208 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bore-backend
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bore
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bore
+        app.kubernetes.io/component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: backend
+        image: bore/backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: PORT
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: JWT_SECRET
+        - name: INTERNAL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: INTERNAL_API_KEY
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: DB_PASSWORD
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: REDIS_PORT
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: REDIS_PASSWORD
+        - name: METRICS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: METRICS_ENABLED
+        - name: METRICS_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: METRICS_PATH
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: LOG_LEVEL
+        - name: CORS_ORIGIN
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: CORS_ORIGIN
+        - name: RATE_LIMIT_WINDOW_MS
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: RATE_LIMIT_WINDOW_MS
+        - name: RATE_LIMIT_MAX_REQUESTS
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: RATE_LIMIT_MAX_REQUESTS
+        - name: MAX_TUNNELS_PER_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: MAX_TUNNELS_PER_SERVER
+        - name: TOTAL_SYSTEM_CAPACITY
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: TOTAL_SYSTEM_CAPACITY
+        - name: RESERVED_CAPACITY_PERCENT
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: RESERVED_CAPACITY_PERCENT
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bore-backend-service
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backend
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bore-backend-pdb
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bore
+      app.kubernetes.io/component: backend

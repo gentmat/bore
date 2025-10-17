@@ -1,0 +1,106 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bore-secrets
+                  key: DB_PASSWORD
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_FILE="/backup/postgres-$(date +%Y%m%d-%H%M%S).sql"
+              pg_dump -h postgres-service -U postgres -d bore_db > $BACKUP_FILE
+
+              # Upload to cloud storage (example with AWS S3)
+              if command -v aws >/dev/null 2>&1; then
+                aws s3 cp $BACKUP_FILE s3://bore-backups/postgres/
+              fi
+
+              # Keep only last 7 days of backups
+              find /backup -name "postgres-*.sql" -mtime +7 -delete
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: redis-backup
+            image: redis:7-alpine
+            env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bore-secrets
+                  key: REDIS_PASSWORD
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_FILE="/backup/redis-$(date +%Y%m%d-%H%M%S).rdb"
+              redis-cli -h redis-service -a $REDIS_PASSWORD --rdb $BACKUP_FILE
+
+              # Upload to cloud storage
+              if command -v aws >/dev/null 2>&1; then
+                aws s3 cp $BACKUP_FILE s3://bore-backups/redis/
+              fi
+
+              # Keep only last 7 days of backups
+              find /backup -name "redis-*.rdb" -mtime +7 -delete
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+              mountPath: /backup
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-pvc
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd

@@ -253,13 +253,32 @@ npm run migrate:down
 
 ## 📊 Monitoring
 
-The backend exposes metrics for monitoring:
+Bore includes a comprehensive monitoring stack with Prometheus and Grafana:
 
-- **/health** - Health check endpoint
-- **/metrics** - Prometheus metrics
-- **/api/v1/admin/stats** - System statistics
+### Quick Setup
+```bash
+cd backend
+./scripts/setup-monitoring.sh
+```
 
-Integrate with Prometheus and Grafana for comprehensive monitoring.
+### Available Dashboards
+- **🎯 Overview Dashboard**: System health and tunnel statistics
+- **⚡ Performance Dashboard**: Response times and throughput metrics
+- **🔧 System Dashboard**: Instance status and resource utilization
+
+### Access URLs
+- **Grafana**: http://localhost:3001 (admin / `${GRAFANA_PASSWORD}`)
+- **Prometheus**: http://localhost:9090
+- **Metrics**: http://localhost:3000/metrics
+
+### Key Metrics
+- Active tunnels and connections
+- API response times (P50, P90, P99)
+- Instance health distribution
+- Connection success rates
+- System throughput
+
+📖 **Full Documentation**: See [MONITORING.md](MONITORING.md) for detailed setup and configuration.
 
 ## 🔒 Security
 
@@ -296,6 +315,11 @@ cargo test --workspace
 - **Development Guide**: `DEVELOPMENT.md` - Contributing and development setup
 
 ### Additional Resources
+- **API Documentation**: `docs/api/` - Complete REST API reference
+- **Kubernetes Deployment**: `KUBERNETES.md` - Production-ready K8s manifests and deployment guide
+- **Monitoring Guide**: `MONITORING.md` - Complete monitoring setup with Grafana dashboards
+- **Integration Tests**: `tests/run_integration_tests.sh` - Comprehensive tunnel flow testing
+- **Performance Testing**: `tests/run_performance_tests.sh` - Benchmarks and regression testing
 - **Troubleshooting Guide**: `TROUBLESHOOTING.md` - Solutions to common problems
 - **Quick Reference**: `QUICK_REFERENCE.md` - Fast access guide for developers
 - **Changelog**: `CHANGELOG.md` - Version history and upgrade guides

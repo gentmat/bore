@@ -1,0 +1,56 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: bore-development
+  namespace: bore-system
+
+bases:
+  - ../../base
+
+namespace: bore-dev
+
+namePrefix: dev-
+
+commonLabels:
+  environment: development
+
+patchesStrategicMerge:
+  - backend-replica-patch.yaml
+  - resource-limits-patch.yaml
+
+replicas:
+  - name: bore-backend
+    count: 1
+  - name: bore-server
+    count: 1
+
+images:
+  - name: bore/backend
+    newTag: latest
+  - name: bore/server
+    newTag: latest
+
+configMapGenerator:
+  - name: bore-config
+    behavior: merge
+    literals:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - METRICS_ENABLED=true
+      - RATE_LIMIT_MAX_REQUESTS=1000
+      - MAX_TUNNELS_PER_SERVER=50
+
+secretGenerator:
+  - name: bore-secrets
+    behavior: merge
+    literals:
+      - JWT_SECRET=dev-jwt-secret-key
+      - INTERNAL_API_KEY=dev-internal-api-key
+      - DB_PASSWORD=dev-postgres-password
+      - REDIS_PASSWORD=dev-redis-password
+      - GRAFANA_PASSWORD=admin
+
+resources:
+  - development-services.yaml

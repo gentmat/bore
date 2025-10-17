@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::{sleep, timeout};
-use tracing::{info, info_span, warn, Instrument};
+use tracing::{error, info, info_span, warn, Instrument};
 use uuid::Uuid;
 
 use bore_shared::{Authenticator, ClientMessage, Delimited, ServerMessage, CONTROL_PORT};
@@ -247,9 +247,20 @@ impl Server {
                     return Ok(());
                 }
 
-                user_id = validation
-                    .user_id
-                    .expect("user_id should be present for valid key");
+                // CRITICAL: Don't panic on missing user_id - handle gracefully to prevent DoS
+                // Backend bugs (data migration, partial rollouts, etc.) should not crash the server
+                let Some(validated_user_id) = validation.user_id else {
+                    error!(
+                        "Backend returned valid=true but missing user_id. This is a backend bug. \
+                        Rejecting connection to prevent undefined behavior."
+                    );
+                    stream.send(ServerMessage::Error(
+                        "Authentication service returned invalid data. Please contact support.".to_string()
+                    )).await?;
+                    return Ok(());
+                };
+                
+                user_id = validated_user_id;
                 max_tunnels = validation.max_concurrent_tunnels.unwrap_or(5);
 
                 instance_id = validation.instance_id.clone();
@@ -415,6 +426,27 @@ impl Server {
             "Tunnel session started"
         );
 
+        // CRITICAL: Send Hello FIRST to prevent client timeout (3s), then log in background
+        // Backend logging can take up to 5s, which exceeds client's NETWORK_TIMEOUT
+        stream.send(ServerMessage::Hello(public_port)).await?;
+
+        // Log tunnel start with backend (in background to not block)
+        let backend_clone = Arc::clone(&self.backend);
+        let user_id_clone = user_id.clone();
+        let server_id_clone = self.server_id.clone();
+        let session_id_handle = tokio::spawn(async move {
+            match backend_clone
+                .log_tunnel_start(&user_id_clone, public_port, requested_port, &server_id_clone)
+                .await
+            {
+                Ok(id) => id,
+                Err(err) => {
+                    warn!(%err, "Failed to log tunnel start");
+                    format!("session-{}", Uuid::new_v4())
+                }
+            }
+        });
+
         if let Some(instance_id) = instance_id.clone() {
             let backend = Arc::clone(&self.backend);
             tokio::spawn(async move {
@@ -431,22 +463,6 @@ impl Server {
                 }
             });
         }
-
-        // Log tunnel start with backend
-        let session_id = match self
-            .backend
-            .log_tunnel_start(&user_id, public_port, requested_port, &self.server_id)
-            .await
-        {
-            Ok(id) => id,
-            Err(err) => {
-                warn!(%err, "Failed to log tunnel start");
-                format!("session-{}", Uuid::new_v4())
-            }
-        };
-
-        // Send Hello with assigned port
-        stream.send(ServerMessage::Hello(public_port)).await?;
 
         // Main tunnel loop
         let result = self
@@ -474,6 +490,15 @@ impl Server {
                 self.user_tunnels.remove(&user_id);
             }
         }
+
+        // Get session_id from background task
+        let session_id = match session_id_handle.await {
+            Ok(id) => id,
+            Err(err) => {
+                warn!(%err, "Failed to await session_id task");
+                format!("session-{}", Uuid::new_v4())
+            }
+        };
 
         // Log tunnel end
         if let Err(err) = self.backend.log_tunnel_end(&session_id, 0).await {

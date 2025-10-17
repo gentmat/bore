@@ -1,0 +1,35 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: bore-critical
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: priority-class
+value: 1000
+globalDefault: false
+description: "Priority class for critical Bore components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: bore-high
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: priority-class
+value: 800
+globalDefault: false
+description: "Priority class for high priority Bore components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: bore-standard
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: priority-class
+value: 500
+globalDefault: false
+description: "Priority class for standard Bore components"

@@ -1,0 +1,27 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bore-config
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: config
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "bore_db"
+  DB_USER: "postgres"
+  METRICS_ENABLED: "true"
+  METRICS_PATH: "/metrics"
+  LOG_LEVEL: "info"
+  CORS_ORIGIN: "*"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  MAX_TUNNELS_PER_SERVER: "100"
+  TOTAL_SYSTEM_CAPACITY: "1000"
+  RESERVED_CAPACITY_PERCENT: "20"

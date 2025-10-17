@@ -1,0 +1,188 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bore-server
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: bore-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bore
+      app.kubernetes.io/component: bore-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bore
+        app.kubernetes.io/component: bore-server
+        server-id: "bore-server-{{ .Release.Revision }}"
+    spec:
+      containers:
+      - name: bore-server
+        image: bore/server:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 7835
+          name: tunnel
+          protocol: TCP
+        env:
+        - name: BACKEND_URL
+          value: "http://bore-backend-service:3000"
+        - name: INTERNAL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: INTERNAL_API_KEY
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: bore-config
+              key: REDIS_PORT
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bore-secrets
+              key: REDIS_PASSWORD
+        - name: SERVER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['server-id']
+        - name: BIND_ADDR
+          value: "0.0.0.0"
+        - name: BIND_TUNNELS
+          value: "0.0.0.0"
+        - name: MIN_PORT
+          value: "1024"
+        - name: MAX_PORT
+          value: "65535"
+        command:
+        - "/app/bore-server"
+        - "--bind-addr"
+        - "0.0.0.0"
+        - "--bind-tunnels"
+        - "0.0.0.0"
+        - "--backend-url"
+        - "http://bore-backend-service:3000"
+        - "--server-id"
+        - "$(SERVER_ID)"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          tcpSocket:
+            port: 7835
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 7835
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 10"]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bore-server-service
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: bore-server
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 7835
+    targetPort: 7835
+    protocol: TCP
+    name: tunnel
+  selector:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: bore-server
+  # LoadBalancer configuration - adjust based on your cloud provider
+  # sessionAffinity: ClientIP
+  # sessionAffinityConfig:
+  #   clientIP:
+  #     timeoutSeconds: 300
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bore-server-hpa
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: bore-server
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bore-server
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bore-server-pdb
+  namespace: bore-system
+  labels:
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: bore-server
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bore
+      app.kubernetes.io/component: bore-server

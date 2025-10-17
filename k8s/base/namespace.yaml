@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bore-system
+  labels:
+    name: bore-system
+    app.kubernetes.io/name: bore
+    app.kubernetes.io/component: system

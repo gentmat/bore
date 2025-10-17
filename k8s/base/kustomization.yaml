@@ -1,0 +1,63 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: bore-system
+  namespace: bore-system
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - postgres.yaml
+  - redis.yaml
+  - backend.yaml
+  - bore-server.yaml
+  - monitoring.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: bore
+  app.kubernetes.io/version: "v0.6.0"
+  app.kubernetes.io/managed-by: "kustomize"
+
+replicas:
+  - name: bore-backend
+    count: 2
+  - name: bore-server
+    count: 3
+
+images:
+  - name: bore/backend
+    newTag: v0.6.0
+  - name: bore/server
+    newTag: v0.6.0
+
+patchesStrategicMerge:
+  # Add any patch files here if needed
+
+configMapGenerator:
+  - name: bore-config
+    literals:
+      - LOG_LEVEL=info
+      - METRICS_ENABLED=true
+
+secretGenerator:
+  - name: bore-secrets
+    literals:
+      # These should be replaced with actual secrets in production
+      - JWT_SECRET=change-me-in-production
+      - INTERNAL_API_KEY=change-me-in-production
+      - DB_PASSWORD=change-me-in-production
+      - REDIS_PASSWORD=change-me-in-production
+      - GRAFANA_PASSWORD=change-me-in-production
+
+vars:
+  - name: BORE_NAMESPACE
+    objref:
+      kind: ConfigMap
+      name: bore-config
+      apiVersion: v1
+    fieldref:
+      fieldpath: metadata.namespace

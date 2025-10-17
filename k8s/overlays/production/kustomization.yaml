@@ -1,0 +1,61 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: bore-production
+  namespace: bore-system
+
+bases:
+  - ../../base
+
+namespace: bore-prod
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+patchesStrategicMerge:
+  - backend-replica-patch.yaml
+  - resource-limits-patch.yaml
+  - security-patch.yaml
+  - backup-patch.yaml
+
+replicas:
+  - name: bore-backend
+    count: 3
+  - name: bore-server
+    count: 5
+
+images:
+  - name: bore/backend
+    newTag: v0.6.0
+  - name: bore/server
+    newTag: v0.6.0
+
+configMapGenerator:
+  - name: bore-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - METRICS_ENABLED=true
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - MAX_TUNNELS_PER_SERVER=200
+      - TOTAL_SYSTEM_CAPACITY=5000
+
+secretGenerator:
+  - name: bore-secrets
+    behavior: merge
+    literals:
+      # These should be replaced with actual production secrets
+      - JWT_SECRET=production-jwt-secret-key
+      - INTERNAL_API_KEY=production-internal-api-key
+      - DB_PASSWORD=production-postgres-password
+      - REDIS_PASSWORD=production-redis-password
+      - GRAFANA_PASSWORD=production-grafana-password
+
+resources:
+  - production-network-policies.yaml
+  - production-priority-classes.yaml

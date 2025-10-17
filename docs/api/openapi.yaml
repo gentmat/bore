@@ -1,0 +1,1276 @@
+openapi: 3.0.3
+info:
+  title: Bore API
+  description: |
+    Complete REST API for the Bore TCP tunneling solution.
+
+    ## Overview
+    The Bore API provides comprehensive management capabilities for TCP tunnels, including:
+    - User Authentication with JWT tokens
+    - Instance Management for tunnel lifecycle
+    - Server Management for multi-server coordination
+    - Real-time Updates via WebSocket/SSE
+    - Metrics and Monitoring endpoints
+    - Administrative functions
+
+    ## Authentication
+    Most endpoints require authentication using one of the following methods:
+    - **JWT Token**: `Authorization: Bearer <token>` (for user operations)
+    - **API Key**: `X-API-Key: <api_key>` (for bore-server communication)
+    - **Internal API Key**: `X-Internal-API-Key: <key>` (for service-to-service)
+
+    ## Rate Limiting
+    API requests are rate limited to prevent abuse:
+    - Authentication: 10 requests per 15 minutes
+    - General API: 100 requests per 15 minutes
+    - Instance creation: 5 requests per hour
+
+    ## Error Handling
+    All errors return a consistent JSON format with error codes and human-readable messages.
+  version: 0.6.0
+  contact:
+    name: Bore Team
+    email: support@bore.example.com
+    url: https://github.com/ekzhang/bore
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://api.bore.example.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns the health status of the API service
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Creates a new user account and returns user details with API key
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticates user and returns JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Retrieves details of the currently authenticated user
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidates the current JWT token
+      operationId: logoutUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/instances:
+    get:
+      tags:
+        - Instances
+      summary: List instances
+      description: Retrieves a paginated list of tunnel instances
+      operationId: listInstances
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/ServerId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Order'
+      responses:
+        '200':
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Instances
+      summary: Create instance
+      description: Creates a new tunnel instance
+      operationId: createInstance
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '201':
+          description: Instance created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/instances/{instanceId}:
+    get:
+      tags:
+        - Instances
+      summary: Get instance
+      description: Retrieves details of a specific tunnel instance
+      operationId: getInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+      responses:
+        '200':
+          description: Instance details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceDetailsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Instances
+      summary: Update instance
+      description: Updates a tunnel instance
+      operationId: updateInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceRequest'
+      responses:
+        '200':
+          description: Instance updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Instances
+      summary: Delete instance
+      description: Deletes a tunnel instance
+      operationId: deleteInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+      responses:
+        '204':
+          description: Instance deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/instances/{instanceId}/status:
+    put:
+      tags:
+        - Instances
+      summary: Update instance status
+      description: Updates the status of a tunnel instance (used by bore-servers)
+      operationId: updateInstanceStatus
+      security:
+        - BearerAuth: []
+        - InternalApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/instances/{instanceId}/logs:
+    get:
+      tags:
+        - Instances
+      summary: Get instance logs
+      description: Retrieves logs for a specific tunnel instance
+      operationId: getInstanceLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+        - $ref: '#/components/parameters/LogLimit'
+        - $ref: '#/components/parameters/LogLevel'
+        - $ref: '#/components/parameters/Since'
+      responses:
+        '200':
+          description: Logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/servers:
+    get:
+      tags:
+        - Servers
+      summary: List servers
+      description: Retrieves a list of available bore-servers
+      operationId: listServers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of servers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/servers/register:
+    post:
+      tags:
+        - Servers
+      summary: Register server
+      description: Registers a new bore-server with the backend
+      operationId: registerServer
+      security:
+        - InternalApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterServerRequest'
+      responses:
+        '201':
+          description: Server registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/servers/{serverId}/heartbeat:
+    post:
+      tags:
+        - Servers
+      summary: Server heartbeat
+      description: Sends heartbeat from bore-server to backend
+      operationId: serverHeartbeat
+      security:
+        - InternalApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/ServerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeartbeatRequest'
+      responses:
+        '200':
+          description: Heartbeat received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/servers/{serverId}:
+    get:
+      tags:
+        - Servers
+      summary: Get server
+      description: Retrieves details of a specific server
+      operationId: getServer
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ServerId'
+      responses:
+        '200':
+          description: Server details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerDetailsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/metrics/system:
+    get:
+      tags:
+        - Metrics
+      summary: Get system metrics
+      description: Retrieves system-wide metrics and statistics
+      operationId: getSystemMetrics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: System metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetricsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/metrics/user:
+    get:
+      tags:
+        - Metrics
+      summary: Get user metrics
+      description: Retrieves metrics for the current user
+      operationId: getUserMetrics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMetricsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Prometheus metrics
+      description: Returns metrics in Prometheus format for monitoring systems
+      operationId: getPrometheusMetrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /ws/instances:
+    get:
+      tags:
+        - WebSocket
+      summary: Instance WebSocket
+      description: WebSocket endpoint for real-time instance updates
+      operationId: instanceWebSocket
+      responses:
+        '101':
+          description: WebSocket connection established
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    InternalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "0.6.0"
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Request validation failed
+            details:
+              type: object
+              example:
+                field: "Invalid email format"
+            request_id:
+              type: string
+              example: "req_123456789"
+            timestamp:
+              type: string
+              format: date-time
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "SecurePassword123!"
+        name:
+          type: string
+          maxLength: 100
+          example: "John Doe"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          example: "SecurePassword123!"
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "user_123"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        api_key:
+          type: string
+          example: "sk_live_1234567890abcdef"
+        role:
+          type: string
+          enum: [user, admin]
+          example: "user"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        expires_in:
+          type: integer
+          example: 3600
+
+    UserDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "user_123"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        api_key:
+          type: string
+          example: "sk_live_1234567890abcdef"
+        role:
+          type: string
+          enum: [user, admin]
+          example: "user"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+        last_login:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+        stats:
+          type: object
+          properties:
+            total_instances:
+              type: integer
+              example: 5
+            active_instances:
+              type: integer
+              example: 2
+            total_bandwidth:
+              type: integer
+              example: 1048576
+
+    CreateInstanceRequest:
+      type: object
+      required:
+        - name
+        - local_port
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "my-web-app"
+        local_port:
+          type: integer
+          minimum: 1024
+          maximum: 65535
+          example: 8080
+        server_id:
+          type: string
+          example: "server_1"
+        region:
+          type: string
+          example: "us-east"
+        protocol:
+          type: string
+          enum: [tcp]
+          default: "tcp"
+        max_connections:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+
+    UpdateInstanceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "updated-web-app"
+        max_connections:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          example: 150
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [online, offline, error, starting]
+          example: "online"
+        tunnel_connected:
+          type: boolean
+          example: true
+        last_heartbeat:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+
+    InstanceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "inst_123"
+        name:
+          type: string
+          example: "my-web-app"
+        local_port:
+          type: integer
+          example: 8080
+        remote_port:
+          type: integer
+          example: 12345
+        server_id:
+          type: string
+          example: "server_1"
+        status:
+          type: string
+          enum: [starting, online, offline, error, degraded]
+          example: "online"
+        tunnel_connected:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-01T00:00:00Z"
+        connection_string:
+          type: string
+          example: "bore.example.com:12345"
+
+    InstanceDetailsResponse:
+      allOf:
+        - $ref: '#/components/schemas/InstanceResponse'
+        - type: object
+          properties:
+            updated_at:
+              type: string
+              format: date-time
+              example: "2024-01-01T12:00:00Z"
+            stats:
+              type: object
+              properties:
+                bytes_sent:
+                  type: integer
+                  example: 1048576
+                bytes_received:
+                  type: integer
+                  example: 2097152
+                connections:
+                  type: integer
+                  example: 42
+                uptime:
+                  type: integer
+                  example: 3600
+                avg_response_time:
+                  type: number
+                  example: 25
+            server_info:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "server_1"
+                name:
+                  type: string
+                  example: "US-East Server"
+                region:
+                  type: string
+                  example: "us-east"
+                capacity:
+                  type: integer
+                  example: 100
+                active_instances:
+                  type: integer
+                  example: 45
+
+    InstanceListResponse:
+      type: object
+      properties:
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstanceResponse'
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 25
+            limit:
+              type: integer
+              example: 50
+            offset:
+              type: integer
+              example: 0
+            has_more:
+              type: boolean
+              example: false
+
+    RegisterServerRequest:
+      type: object
+      required:
+        - id
+        - name
+        - region
+        - host
+        - port
+        - capacity
+        - version
+      properties:
+        id:
+          type: string
+          example: "server_1"
+        name:
+          type: string
+          example: "US-East Server"
+        region:
+          type: string
+          example: "us-east"
+        host:
+          type: string
+          example: "bore-us-east.example.com"
+        port:
+          type: integer
+          example: 7835
+        capacity:
+          type: integer
+          minimum: 1
+          example: 100
+        version:
+          type: string
+          example: "0.6.0"
+
+    HeartbeatRequest:
+      type: object
+      required:
+        - status
+        - active_instances
+      properties:
+        status:
+          type: string
+          enum: [online, offline, error]
+          example: "online"
+        active_instances:
+          type: integer
+          minimum: 0
+          example: 45
+        load_average:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.45
+        memory_usage:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.67
+        cpu_usage:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.32
+
+    ServerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "server_1"
+        name:
+          type: string
+          example: "US-East Server"
+        region:
+          type: string
+          example: "us-east"
+        host:
+          type: string
+          example: "bore-us-east.example.com"
+        port:
+          type: integer
+          example: 7835
+        status:
+          type: string
+          enum: [online, offline, error]
+          example: "online"
+        capacity:
+          type: integer
+          example: 100
+        version:
+          type: string
+          example: "0.6.0"
+
+    ServerDetailsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ServerResponse'
+        - type: object
+          properties:
+            active_instances:
+              type: integer
+              example: 45
+            load_average:
+              type: number
+              example: 0.45
+            last_heartbeat:
+              type: string
+              format: date-time
+              example: "2024-01-01T12:00:00Z"
+            uptime:
+              type: integer
+              example: 86400
+
+    ServerListResponse:
+      type: object
+      properties:
+        servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerResponse'
+
+    SystemMetricsResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+        tunnels:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 150
+            active:
+              type: integer
+              example: 125
+            offline:
+              type: integer
+              example: 25
+        servers:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 5
+            online:
+              type: integer
+              example: 5
+            offline:
+              type: integer
+              example: 0
+        users:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 1000
+            active:
+              type: integer
+              example: 250
+        performance:
+          type: object
+          properties:
+            avg_response_time:
+              type: number
+              example: 25
+            throughput_mbps:
+              type: number
+              example: 150.5
+            error_rate:
+              type: number
+              example: 0.01
+        resources:
+          type: object
+          properties:
+            cpu_usage:
+              type: number
+              example: 45.2
+            memory_usage:
+              type: number
+              example: 68.7
+            disk_usage:
+              type: number
+              example: 23.1
+
+    UserMetricsResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+        instances:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 5
+            active:
+              type: integer
+              example: 2
+        bandwidth:
+          type: object
+          properties:
+            total_sent:
+              type: integer
+              example: 1048576
+            total_received:
+              type: integer
+              example: 2097152
+        connections:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 150
+            active:
+              type: integer
+              example: 25
+
+    LogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+                example: "2024-01-01T12:00:00Z"
+              level:
+                type: string
+                enum: [error, warn, info, debug]
+                example: "info"
+              message:
+                type: string
+                example: "Instance started successfully"
+              metadata:
+                type: object
+                example:
+                  port: 12345
+                  server: "server_1"
+        total:
+          type: integer
+          example: 50
+
+  parameters:
+    InstanceId:
+      name: instanceId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Instance ID
+      example: "inst_123"
+
+    ServerId:
+      name: serverId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Server ID
+      example: "server_1"
+
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [online, offline, error]
+      description: Filter by status
+      example: "online"
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Number of results
+      example: 50
+
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Pagination offset
+      example: 0
+
+    Sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [created_at, name, status]
+        default: "created_at"
+      description: Sort field
+      example: "created_at"
+
+    Order:
+      name: order
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: "desc"
+      description: Sort order
+      example: "desc"
+
+    LogLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+      description: Number of log entries
+      example: 100
+
+    LogLevel:
+      name: level
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [error, warn, info, debug]
+      description: Log level filter
+      example: "info"
+
+    Since:
+      name: since
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Start time for logs
+      example: "2024-01-01T00:00:00Z"
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: "Request validation failed"
+              details:
+                field: "Invalid email format"
+              timestamp: "2024-01-01T12:00:00Z"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: "Authentication required"
+              timestamp: "2024-01-01T12:00:00Z"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: "Insufficient permissions"
+              timestamp: "2024-01-01T12:00:00Z"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NOT_FOUND
+              message: "Resource not found"
+              timestamp: "2024-01-01T12:00:00Z"
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: CONFLICT
+              message: "Resource already exists"
+              timestamp: "2024-01-01T12:00:00Z"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMITED
+              message: "Rate limit exceeded"
+              details:
+                limit: 100
+                window: 900
+                retry_after: 300
+              timestamp: "2024-01-01T12:00:00Z"
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Authentication
+    description: User authentication and management
+  - name: Instances
+    description: Tunnel instance management
+  - name: Servers
+    description: Server management and coordination
+  - name: Metrics
+    description: System and user metrics
+  - name: WebSocket
+    description: Real-time WebSocket connections
