@@ -116,9 +116,8 @@ jobs:
       - name: Start bore-server
         env:
           RUST_LOG: info
-          BORE_SECRET: test-secret
-          BORE_BACKEND_URL: ""
-          BORE_BACKEND_API_KEY: ""
+          BORE_BACKEND_URL: http://localhost:3000
+          BORE_BACKEND_API_KEY: test-internal-key
         run: |
           cargo build --release --bin bore-server
           ./target/release/bore-server &
