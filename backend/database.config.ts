@@ -24,13 +24,43 @@ interface MigrationConfig {
   timestamp: boolean;
 }
 
+// Parse DATABASE_URL if available, otherwise use individual variables
+const getDatabaseConfig = () => {
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (databaseUrl) {
+    // Parse DATABASE_URL: postgresql://user:password@host:port/database
+    const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
+    if (match) {
+      return {
+        host: match[3],
+        port: parseInt(match[4], 10),
+        database: match[5],
+        user: match[1],
+        password: match[2],
+      };
+    }
+  }
+
+  // Fallback to individual environment variables
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    database: process.env.DB_NAME || 'bore_db',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+  };
+};
+
+const dbConfig = getDatabaseConfig();
+
 const migrationConfig: MigrationConfig = {
   // Database connection settings
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'bore_db',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
+  host: dbConfig.host,
+  port: dbConfig.port,
+  database: dbConfig.database,
+  user: dbConfig.user,
+  password: dbConfig.password,
   
   // Migration settings
   dir: 'migrations',

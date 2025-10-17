@@ -78,14 +78,13 @@ jobs:
       
       - name: Setup database
         env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: bore_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bore_test
           NODE_ENV: test
         run: |
           cd backend
+          echo "DATABASE_URL is set to: $DATABASE_URL"
+          echo "DB_HOST is: ${DB_HOST:-not set}"
+          echo "DB_USER is: ${DB_USER:-not set}"
           npm run migrate:up
       
       - name: Start backend server
