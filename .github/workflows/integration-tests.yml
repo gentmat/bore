@@ -16,6 +16,7 @@ env:
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
   POSTGRES_DB: bore_test
+  CI: true
 
 jobs:
   integration-tests:
