@@ -360,3 +360,4 @@ Built with:
 ---
 
 Made with ❤️ for developers who need secure tunneling
+# Rust workflow trigger
