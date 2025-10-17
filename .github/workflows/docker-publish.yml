@@ -1,0 +1,188 @@
+name: Docker Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          provenance: false
+
+  build-rust-components:
+    name: Build Rust Components
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        component: [bore-client, bore-server]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create Dockerfile for ${{ matrix.component }}
+        run: |
+          # Set binary name (bore-client produces 'bore' binary, bore-server produces 'bore-server')
+          if [ "${{ matrix.component }}" = "bore-client" ]; then
+            BINARY_NAME="bore"
+          else
+            BINARY_NAME="${{ matrix.component }}"
+          fi
+          
+          cat > Dockerfile.${{ matrix.component }} << EOF
+          FROM rust:1.82-slim AS builder
+
+          RUN apt-get update && apt-get install -y \
+              pkg-config \
+              libssl-dev \
+              && rm -rf /var/lib/apt/lists/*
+
+          WORKDIR /app
+          COPY Cargo.toml Cargo.lock ./
+          COPY bore-shared ./bore-shared/
+          COPY bore-server ./bore-server/
+          COPY bore-client ./bore-client/
+
+          RUN cargo build --release -p ${{ matrix.component }}
+
+          FROM debian:bookworm-slim
+          RUN apt-get update && apt-get install -y \
+              ca-certificates \
+              libssl3 \
+              && rm -rf /var/lib/apt/lists/*
+          COPY --from=builder /app/target/release/${BINARY_NAME} /usr/local/bin/
+          ENTRYPOINT ["${BINARY_NAME}"]
+          EOF
+
+      - name: Build and push ${{ matrix.component }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.component }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          provenance: false
+
+  docker-compose-test:
+    name: Test Docker Compose Setup
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test docker-compose build
+        working-directory: backend
+        run: |
+          docker compose config
+          docker compose build
+
+      - name: Test docker-compose up
+        working-directory: backend
+        run: |
+          docker compose up -d
+          echo "Waiting for services to start..."
+          sleep 30
+          docker compose ps
+          docker compose logs
+
+      - name: Health check
+        run: |
+          echo "Checking backend health..."
+          timeout 120 bash -c 'until curl -f http://localhost:3000/health 2>/dev/null; do
+            echo "Waiting for backend to be ready..."
+            sleep 5
+          done' || (echo "Health check failed, showing logs:" && cd backend && docker compose logs backend && docker compose logs postgres && docker compose logs redis && exit 1)
+
+      - name: Cleanup
+        if: always()
+        working-directory: backend
+        run: docker compose down -v
