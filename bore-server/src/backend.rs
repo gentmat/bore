@@ -301,9 +301,7 @@ impl BackendClient {
 
         // All retry attempts exhausted
         Err(last_error.unwrap_or_else(|| {
-            anyhow!(
-                "backend POST {path} failed after {RETRY_ATTEMPTS} attempts"
-            )
+            anyhow!("backend POST {path} failed after {RETRY_ATTEMPTS} attempts")
         }))
     }
 
