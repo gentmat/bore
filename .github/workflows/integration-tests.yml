@@ -76,18 +76,37 @@ jobs:
           npm run migrate:up || true
       
       - name: Start backend server
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: bore_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          REDIS_ENABLED: true
+          JWT_SECRET: test-secret-key
+          INTERNAL_API_KEY: test-internal-key
+          PORT: 3000
         run: |
           cd backend
           npm start &
-          echo $! > backend.pid
-          sleep 5
+          echo $! > ../backend.pid
+          sleep 10
+          # Check if server started successfully
+          curl -f http://localhost:3000/health || exit 1
       
       - name: Start bore-server
+        env:
+          RUST_LOG: info
+          BORE_SECRET: test-secret
         run: |
           cargo build --release --bin bore-server
           ./target/release/bore-server &
           echo $! > bore-server.pid
-          sleep 2
+          sleep 5
+          # Verify bore-server is running
+          ps -p $(cat bore-server.pid) || exit 1
       
       - name: Run Rust unit tests
         run: cargo test --workspace --lib
