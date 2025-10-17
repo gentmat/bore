@@ -60,6 +60,12 @@ struct UsageLogRequest {
     bytes_out: u64,
 }
 
+/// Response from starting a tunnel session.
+#[derive(Debug, Deserialize)]
+struct SessionResponse {
+    session_id: String,
+}
+
 /// Backend API client for authentication and usage tracking.
 pub struct BackendClient {
     http_client: Client,
@@ -164,7 +170,7 @@ impl BackendClient {
                 max_concurrent_tunnels: None,
                 max_bandwidth_gb: None,
                 usage_allowed: false,
-                message: Some(format!("Backend error: {}", status)),
+                message: Some(format!("Backend error: {status}")),
                 instance_id: None,
             });
         }
@@ -214,11 +220,6 @@ impl BackendClient {
             .send()
             .await?
             .error_for_status()?; // Propagate HTTP errors (4xx/5xx)
-
-        #[derive(Deserialize)]
-        struct SessionResponse {
-            session_id: String,
-        }
 
         let session = response.json::<SessionResponse>().await?;
         Ok(session.session_id)
@@ -301,9 +302,7 @@ impl BackendClient {
         // All retry attempts exhausted
         Err(last_error.unwrap_or_else(|| {
             anyhow!(
-                "backend POST {} failed after {} attempts",
-                path,
-                RETRY_ATTEMPTS
+                "backend POST {path} failed after {RETRY_ATTEMPTS} attempts"
             )
         }))
     }
@@ -332,7 +331,7 @@ impl BackendClient {
             Some(Value::Object(payload))
         };
 
-        let path = format!("api/internal/instances/{}/tunnel-connected", instance_id);
+        let path = format!("api/internal/instances/{instance_id}/tunnel-connected");
         self.post_with_retry(&path, body.as_ref()).await
     }
 
@@ -341,7 +340,7 @@ impl BackendClient {
             return Ok(());
         }
 
-        let path = format!("api/internal/instances/{}/tunnel-disconnected", instance_id);
+        let path = format!("api/internal/instances/{instance_id}/tunnel-disconnected");
         self.post_with_retry(&path, None).await
     }
 
@@ -444,7 +443,7 @@ mod tests {
             .await
             .expect("failed to bind listener");
         let addr = listener.local_addr().unwrap();
-        let backend_url = format!("http://{}", addr);
+        let backend_url = format!("http://{addr}");
 
         let handle = tokio::spawn(capture_single_request(listener));
 
@@ -472,7 +471,7 @@ mod tests {
             .await
             .expect("failed to bind listener");
         let addr = listener.local_addr().unwrap();
-        let backend_url = format!("http://{}", addr);
+        let backend_url = format!("http://{addr}");
 
         let handle = tokio::spawn(capture_single_request(listener));
 
