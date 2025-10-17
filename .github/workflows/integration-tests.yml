@@ -117,6 +117,8 @@ jobs:
         env:
           RUST_LOG: info
           BORE_SECRET: test-secret
+          BORE_BACKEND_URL: ""
+          BORE_BACKEND_API_KEY: ""
         run: |
           cargo build --release --bin bore-server
           ./target/release/bore-server &
