@@ -1,4 +1,4 @@
-import rateLimit, { MemoryStore } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 
 /**

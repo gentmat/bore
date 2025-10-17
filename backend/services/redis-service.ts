@@ -8,18 +8,15 @@ import config from '../config';
 import { logger } from '../utils/logger';
 
 let redis: any;
-let RedisClientType: any;
 
 try {
   redis = require('redis');
-  RedisClientType = redis.RedisClientType;
 } catch (error) {
   logger.warn('Redis package not available, Redis features will be disabled');
   redis = null;
-  RedisClientType = null;
 }
 
-type RedisClient = RedisClientType;
+type RedisClient = any;
 
 let redisClient: RedisClient | null = null;
 let isConnected = false;
