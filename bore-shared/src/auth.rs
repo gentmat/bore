@@ -12,13 +12,15 @@ use crate::protocol::{ClientMessage, Delimited, ServerMessage};
 pub struct Authenticator(Hmac<Sha256>);
 
 impl Authenticator {
-    /// Generate an authenticator from a secret.
+    /// Create an authenticator from a secret string.
+    #[must_use]
     pub fn new(secret: &str) -> Self {
         let hashed_secret = Sha256::new().chain_update(secret).finalize();
         Self(Hmac::new_from_slice(&hashed_secret).expect("HMAC can take key of any size"))
     }
 
-    /// Generate a reply message for a challenge.
+    /// Generate an answer to the given challenge.
+    #[must_use]
     pub fn answer(&self, challenge: &Uuid) -> String {
         let mut hmac = self.0.clone();
         hmac.update(challenge.as_bytes());
@@ -37,8 +39,9 @@ impl Authenticator {
     /// assert!(auth.validate(&challenge, &auth.answer(&challenge)));
     /// assert!(!auth.validate(&challenge, "wrong answer"));
     /// ```
+    #[must_use]
     pub fn validate(&self, challenge: &Uuid, tag: &str) -> bool {
-        hex::decode(tag).map_or(false, |tag| {
+        hex::decode(tag).is_ok_and(|tag| {
             let mut hmac = self.0.clone();
             hmac.update(challenge.as_bytes());
             hmac.verify_slice(&tag).is_ok()
