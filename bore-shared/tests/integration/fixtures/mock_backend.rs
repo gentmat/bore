@@ -109,6 +109,9 @@ impl MockBackend {
         // Route requests
         match (method, path) {
             ("GET", "/health") => self.health_check(),
+            ("POST", path) if path.starts_with("/api/internal/validate-key") => {
+                self.validate_api_key_internal(body)
+            }
             ("POST", path) if path.starts_with("/api/v1/auth/validate") => {
                 self.validate_api_key(body)
             }
@@ -123,6 +126,68 @@ impl MockBackend {
         let body = json!({
             "status": "healthy",
             "service": "mock-backend"
+        });
+        self.json_response(200, &body)
+    }
+
+    fn validate_api_key_internal(&self, body: &str) -> String {
+        // Parse the API key from request body (bore-server format)
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(body) {
+            if let Some(api_key) = json["api_key"].as_str() {
+                // Check if it's a tunnel token (starts with "tk_")
+                if api_key.starts_with("tk_") {
+                    let tokens = self.tunnel_tokens.lock().unwrap();
+                    if let Some(tunnel_token) = tokens.get(api_key) {
+                        // Check if token is expired
+                        if std::time::SystemTime::now() < tunnel_token.expires_at {
+                            let body = json!({
+                                "valid": true,
+                                "user_id": tunnel_token.user_id,
+                                "email": "test@example.com",
+                                "plan_type": "pro",
+                                "max_concurrent_tunnels": 10,
+                                "max_bandwidth_gb": 1000,
+                                "usage_allowed": true,
+                                "message": null,
+                                "instance_id": tunnel_token.instance_id
+                            });
+                            return self.json_response(200, &body);
+                        }
+                    }
+                } else {
+                    // Regular API key validation
+                    let api_keys = self.api_keys.lock().unwrap();
+                    if let Some(user_id) = api_keys.get(api_key) {
+                        let users = self.users.lock().unwrap();
+                        if let Some(user) = users.get(user_id) {
+                            let body = json!({
+                                "valid": true,
+                                "user_id": user.id,
+                                "email": user.email,
+                                "plan_type": "pro",
+                                "max_concurrent_tunnels": 10,
+                                "max_bandwidth_gb": 1000,
+                                "usage_allowed": true,
+                                "message": null,
+                                "instance_id": null
+                            });
+                            return self.json_response(200, &body);
+                        }
+                    }
+                }
+            }
+        }
+
+        let body = json!({
+            "valid": false,
+            "user_id": null,
+            "email": null,
+            "plan_type": null,
+            "max_concurrent_tunnels": null,
+            "max_bandwidth_gb": null,
+            "usage_allowed": false,
+            "message": "Invalid API key",
+            "instance_id": null
         });
         self.json_response(200, &body)
     }
