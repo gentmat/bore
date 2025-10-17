@@ -284,6 +284,7 @@ impl Server {
                 // Note: Tunnel limit will be checked atomically in handle_tunnel_session
 
                 // Now expect Hello message with port request
+                #[allow(clippy::single_match_else)]
                 match stream.recv_timeout().await? {
                     Some(ClientMessage::Hello(port)) => {
                         requested_port = port;
@@ -351,6 +352,7 @@ impl Server {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn handle_tunnel_session(
         &self,
         mut stream: Delimited<TcpStream>,
