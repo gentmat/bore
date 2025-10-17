@@ -31,7 +31,7 @@ describe('Validation Schemas', () => {
       const { error } = schemas.signup.validate(data);
       
       expect(error).toBeDefined();
-      expect(error!.details[0].path).toContain('email');
+      expect(error!.details[0]!.path).toContain('email');
     });
 
     it('should reject short password', () => {
@@ -44,7 +44,7 @@ describe('Validation Schemas', () => {
       const { error } = schemas.signup.validate(data);
       
       expect(error).toBeDefined();
-      expect(error!.details[0].path).toContain('password');
+      expect(error!.details[0]!.path).toContain('password');
     });
 
     it('should reject short name', () => {
@@ -57,7 +57,7 @@ describe('Validation Schemas', () => {
       const { error } = schemas.signup.validate(data);
       
       expect(error).toBeDefined();
-      expect(error!.details[0].path).toContain('name');
+      expect(error!.details[0]!.path).toContain('name');
     });
   });
 
@@ -85,7 +85,7 @@ describe('Validation Schemas', () => {
       const { error } = schemas.createInstance.validate(data);
       
       expect(error).toBeDefined();
-      expect(error!.details[0].path).toContain('localPort');
+      expect(error!.details[0]!.path).toContain('localPort');
     });
 
     it('should use default region if not provided', () => {
