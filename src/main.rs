@@ -1,7 +1,8 @@
 use std::net::IpAddr;
 
 use anyhow::Result;
-use bore_cli::{client::Client, server::Server};
+use bore_client::Client;
+use bore_server::Server;
 use clap::{error::ErrorKind, CommandFactory, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -68,7 +69,6 @@ enum Command {
     },
 }
 
-#[tokio::main]
 async fn run(command: Command) -> Result<()> {
     match command {
         Command::Local {
@@ -111,7 +111,8 @@ async fn run(command: Command) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
-    run(Args::parse().command)
+    run(Args::parse().command).await
 }

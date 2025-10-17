@@ -69,6 +69,22 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
     const user = await db.getUserById(tokenInfo.user_id);
     const planType = (user?.plan || 'trial') as keyof typeof config.plans;
     
+    // Check if plan has expired
+    if (user?.plan_expires) {
+      const planExpiry = user.plan_expires instanceof Date 
+        ? user.plan_expires 
+        : new Date(user.plan_expires as string);
+      if (planExpiry < new Date()) {
+        await db.deleteTunnelToken(api_key);
+        res.json({
+          valid: false,
+          usage_allowed: false,
+          message: 'Plan expired'
+        } as ValidationResponse);
+        return;
+      }
+    }
+    
     // Derive limits from config.plans for proper multi-tier support
     const planConfig = config.plans[planType] || config.plans.trial;
     const maxConcurrent = planConfig.maxConcurrentTunnels;

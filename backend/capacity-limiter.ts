@@ -161,6 +161,22 @@ export async function checkUserQuota(userId: string): Promise<UserQuotaCheck> {
       };
     }
     
+    // Check if plan has expired
+    if (user.plan_expires) {
+      const planExpiry = user.plan_expires instanceof Date 
+        ? user.plan_expires 
+        : new Date(user.plan_expires as string);
+      if (planExpiry < new Date()) {
+        return {
+          allowed: false,
+          reason: 'Plan expired',
+          activeTunnels: 0,
+          maxTunnels: 0,
+          plan: user.plan || 'trial'
+        };
+      }
+    }
+    
     const plan = user.plan || 'trial';
     const maxTunnels = maxTunnelsByPlan[plan] || 1;
     

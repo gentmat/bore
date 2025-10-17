@@ -326,6 +326,7 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request,
       server_port: bestServer.port,
       local_port: instance.localPort,
       remote_port: 0, // Will be set when tunnel connects
+      ttl: Math.floor(config.tokens.tunnel.expiresIn / 1000), // Time-to-live in seconds
       expires_at: expiresAt.toISOString(),
       // Also include camelCase for TypeScript/JavaScript clients
       instanceId: instance.id,
