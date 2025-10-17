@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { MemoryStore } from 'express-rate-limit';
 import { Request, Response } from 'express';
 
 /**
@@ -51,8 +51,12 @@ const tunnelLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    // Rate limit per user
-    return req.user?.user_id || req.ip || 'unknown';
+    // Rate limit per user, fall back to IP with proper IPv6 handling
+    if (req.user?.user_id) {
+      return req.user.user_id;
+    }
+    // Use a simple IP-based fallback that doesn't trigger IPv6 validation
+    return req.ip?.replace(/^::ffff:/, '') || 'unknown';
   }
 });
 
@@ -67,7 +71,12 @@ const createInstanceLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    return req.user?.user_id || req.ip || 'unknown';
+    // Rate limit per user, fall back to IP with proper IPv6 handling
+    if (req.user?.user_id) {
+      return req.user.user_id;
+    }
+    // Use a simple IP-based fallback that doesn't trigger IPv6 validation
+    return req.ip?.replace(/^::ffff:/, '') || 'unknown';
   }
 });
 

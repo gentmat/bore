@@ -4,9 +4,20 @@
  * Enables horizontal scaling by moving in-memory state to Redis
  */
 
-import redis, { RedisClientType } from 'redis';
 import config from '../config';
 import { logger } from '../utils/logger';
+
+let redis: any;
+let RedisClientType: any;
+
+try {
+  redis = require('redis');
+  RedisClientType = redis.RedisClientType;
+} catch (error) {
+  logger.warn('Redis package not available, Redis features will be disabled');
+  redis = null;
+  RedisClientType = null;
+}
 
 type RedisClient = RedisClientType;
 
@@ -25,6 +36,12 @@ export async function initializeRedis(): Promise<RedisClient | null> {
   // If Redis is disabled, return null (fall back to in-memory)
   if (!config.redis.enabled) {
     logger.warn('Redis is disabled - using in-memory state (not suitable for production scaling)');
+    return null;
+  }
+
+  // Check if redis package is available
+  if (!redis || !redis.createClient) {
+    logger.error('Redis package is not available - cannot initialize Redis connection');
     return null;
   }
 
