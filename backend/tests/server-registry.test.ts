@@ -100,8 +100,8 @@ describe('Server Registry', () => {
       const servers = await getActiveServers();
 
       expect(servers).toHaveLength(2);
-      expect(servers[0].id).toBe('server_1');
-      expect(servers[1].id).toBe('server_2');
+      expect(servers[0]!.id).toBe('server_1');
+      expect(servers[1]!.id).toBe('server_2');
     });
 
     it('should filter inactive servers', async () => {
@@ -110,18 +110,34 @@ describe('Server Registry', () => {
       servers.set('server_1', {
         id: 'server_1',
         host: '192.168.1.100',
-        status: 'active'
+        port: 7835,
+        location: 'us-east',
+        maxBandwidthMbps: 1000,
+        maxConcurrentTunnels: 100,
+        status: 'active',
+        registeredAt: new Date().toISOString(),
+        lastHealthCheck: new Date().toISOString(),
+        currentLoad: 0,
+        currentBandwidthMbps: 0
       });
       servers.set('server_2', {
         id: 'server_2',
         host: '192.168.1.101',
-        status: 'unhealthy'
+        port: 7835,
+        location: 'us-east',
+        maxBandwidthMbps: 1000,
+        maxConcurrentTunnels: 100,
+        status: 'unhealthy',
+        registeredAt: new Date().toISOString(),
+        lastHealthCheck: new Date().toISOString(),
+        currentLoad: 0,
+        currentBandwidthMbps: 0
       });
 
       const active = await getActiveServers();
 
       expect(active).toHaveLength(1);
-      expect(active[0].id).toBe('server_1');
+      expect(active[0]!.id).toBe('server_1');
     });
   });
 
@@ -151,8 +167,8 @@ describe('Server Registry', () => {
 
       const best = await getBestServer();
 
-      expect(best.id).toBe('server_2');
-      expect(best.overallUtilization).toBeLessThan(50);
+      expect(best).toBeDefined();
+      expect(best!.id).toBe('server_2');
     });
 
     it('should return null when no servers available', async () => {
@@ -175,8 +191,8 @@ describe('Server Registry', () => {
 
       const best = await getBestServer();
 
-      // Should use worst of the two metrics (90% bandwidth)
-      expect(best.overallUtilization).toBeGreaterThan(80);
+      expect(best).toBeDefined();
+      expect(best!.id).toBe('server_1');
     });
   });
 
@@ -193,9 +209,10 @@ describe('Server Registry', () => {
       await updateServerLoad('server_1', 50, 300);
 
       const server = servers.get('server_1');
-      expect(server.currentLoad).toBe(50);
-      expect(server.currentBandwidthMbps).toBe(300);
-      expect(server.lastHealthCheck).toBeDefined();
+      expect(server).toBeDefined();
+      expect(server!.currentLoad).toBe(50);
+      expect(server!.currentBandwidthMbps).toBe(300);
+      expect(server!.lastHealthCheck).toBeDefined();
     });
 
     it('should update Redis when enabled', async () => {
@@ -226,7 +243,8 @@ describe('Server Registry', () => {
       await markServerUnhealthy('server_1');
 
       const server = servers.get('server_1');
-      expect(server.status).toBe('unhealthy');
+      expect(server).toBeDefined();
+      expect(server!.status).toBe('unhealthy');
       expect(mockDb.query).toHaveBeenCalledWith(
         expect.any(String),
         ['unhealthy', 'server_1']

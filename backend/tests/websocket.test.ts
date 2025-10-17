@@ -12,7 +12,6 @@ import request from 'supertest';
 
 describe('WebSocket Tests', () => {
   let authToken: string;
-  let userId: string;
   let clientSocket: Socket;
   const serverUrl = process.env.BACKEND_URL || 'http://localhost:3000';
 
@@ -45,7 +44,6 @@ describe('WebSocket Tests', () => {
       });
 
     authToken = loginResponse.body.token;
-    userId = loginResponse.body.user.id;
   });
 
   afterEach((done) => {
@@ -68,7 +66,7 @@ describe('WebSocket Tests', () => {
       done();
     });
 
-    clientSocket.on('connect_error', (error) => {
+    clientSocket.on('connect_error', (error: Error) => {
       done(new Error(`Connection failed: ${error.message}`));
     });
   }, 10000);
@@ -85,7 +83,7 @@ describe('WebSocket Tests', () => {
       done(new Error('Should not connect with invalid token'));
     });
 
-    clientSocket.on('connect_error', (error) => {
+    clientSocket.on('connect_error', (error: Error) => {
       expect(error).toBeDefined();
       done();
     });
@@ -113,7 +111,7 @@ describe('WebSocket Tests', () => {
       const instanceId = instanceResponse.body.id;
 
       // Listen for status updates
-      clientSocket.on('status-update', (data) => {
+      clientSocket.on('status-update', (data: any) => {
         expect(data).toHaveProperty('instanceId');
         expect(data).toHaveProperty('status');
         expect(data.instanceId).toBe(instanceId);
@@ -131,7 +129,7 @@ describe('WebSocket Tests', () => {
       }, 500);
     });
 
-    clientSocket.on('connect_error', (error) => {
+    clientSocket.on('connect_error', (error: Error) => {
       done(new Error(`Connection failed: ${error.message}`));
     });
   }, 15000);
@@ -148,7 +146,7 @@ describe('WebSocket Tests', () => {
       clientSocket.disconnect();
     });
 
-    clientSocket.on('disconnect', (reason) => {
+    clientSocket.on('disconnect', (reason: string) => {
       expect(reason).toBeDefined();
       done();
     });
@@ -166,7 +164,7 @@ describe('WebSocket Tests', () => {
 
     clientSocket.on('connect', () => {
       // Listen for any status updates
-      clientSocket.on('status-update', (data) => {
+      clientSocket.on('status-update', (_data: any) => {
         // This should only fire for our user's instances
         receivedUnauthorizedUpdate = true;
       });

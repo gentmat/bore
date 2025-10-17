@@ -34,7 +34,7 @@ jest.mock('../middleware/refresh-token', () => ({
 // Mock auth middleware
 jest.mock('../auth-middleware', () => ({
   generateToken: jest.fn().mockReturnValue('mock-jwt-token'),
-  authenticateJWT: jest.fn((req: any, res: any, next: any) => {
+  authenticateJWT: jest.fn((req: any, _res: any, next: any) => {
     req.user = { user_id: 'user_123', email: 'test@example.com' };
     next();
   })
@@ -53,8 +53,6 @@ jest.mock('../config', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { db } = require('../database');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createRefreshToken } = require('../middleware/refresh-token');
 
 // Create test app
 function createTestApp(): Express {

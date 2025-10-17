@@ -8,18 +8,12 @@ import { Response, Request, NextFunction } from 'express';
 
 describe('ErrorResponses', () => {
   let mockRes: Partial<Response>;
-  let mockReq: Partial<Request>;
 
   beforeEach(() => {
     mockRes = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis()
     } as Partial<Response>;
-    mockReq = {
-      id: 'req-123',
-      path: '/api/v1/test',
-      method: 'GET'
-    } as Partial<Request>;
   });
 
   describe('badRequest', () => {

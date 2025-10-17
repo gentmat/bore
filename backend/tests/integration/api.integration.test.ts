@@ -5,9 +5,7 @@
 
 import request from 'supertest';
 import express, { Express } from 'express';
-import bcrypt from 'bcryptjs';
 import { db, initializeDatabase } from '../../database';
-import config from '../../config';
 
 // Import routes
 import authRoutes from '../../routes/auth-routes';
