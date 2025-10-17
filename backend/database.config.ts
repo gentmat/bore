@@ -34,8 +34,8 @@ const migrationConfig: MigrationConfig = {
   checkOrder: true,
   ignorePattern: '.*\\.map$|README\\.md',
   
-  // Create migration files with JS
-  'migration-file-language': 'js',
+  // Create migration files with TypeScript
+  'migration-file-language': 'ts',
   
   // Timestamp format
   timestamp: true,

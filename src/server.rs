@@ -129,18 +129,25 @@ impl Server {
         } else {
             // Client requests any available port in range.
             //
-            // In this case, we bind to 150 random port numbers. We choose this value because in
-            // order to find a free port with probability at least 1-δ, when ε proportion of the
+            // We use a probabilistic approach: try binding to 150 random port numbers.
+            // This value is derived from probability theory to ensure high success rates:
+            //
+            // To find a free port with probability at least 1-δ, when ε proportion of the
             // ports are currently available, it suffices to check approximately -2 ln(δ) / ε
             // independently and uniformly chosen ports (up to a second-order term in ε).
             //
-            // Checking 150 times gives us 99.999% success at utilizing 85% of ports under these
-            // conditions, when ε=0.15 and δ=0.00001.
+            // With 150 attempts, we achieve:
+            // - 99.999% success rate (δ=0.00001)
+            // - When 85% of ports are available (ε=0.15)
+            //
+            // This approach is more efficient than sequential scanning and distributes
+            // load evenly across the port range.
             for _ in 0..150 {
+                // Generate a random port within the allowed range
                 let port = fastrand::u16(self.port_range.clone());
                 match try_bind(port).await {
                     Ok(listener) => return Ok(listener),
-                    Err(_) => continue,
+                    Err(_) => continue, // Port unavailable, try next random port
                 }
             }
             Err("failed to find an available port")
@@ -161,15 +168,29 @@ impl Server {
         match first_msg {
             Some(ClientMessage::Accept(id)) => {
                 // This is a forwarding connection (client accepting an incoming connection)
+                // The flow: External client → Server stores stream → Notifies bore client →
+                // Bore client sends Accept(id) → Server matches ID and forwards data
                 info!(%id, "forwarding connection");
                 match self.conns.remove(&id) {
                     Some((_, mut stream2)) => {
+                        // stream = bore client connection (just received Accept message)
+                        // stream2 = external client connection (waiting to be forwarded)
+                        
+                        // Extract underlying TCP stream from the framed codec
                         let mut parts = stream.into_parts();
                         debug_assert!(parts.write_buf.is_empty(), "framed write buffer not empty");
+                        
+                        // Forward any buffered data from bore client to external client
+                        // Usually empty, but handles edge cases where data arrives before Accept
                         stream2.write_all(&parts.read_buf).await?;
+                        
+                        // Begin bidirectional forwarding: external client ↔ bore client ↔ local service
                         tokio::io::copy_bidirectional(&mut parts.io, &mut stream2).await?;
                     }
-                    None => warn!(%id, "missing connection"),
+                    None => {
+                        // Connection ID not found - likely timed out or already handled
+                        warn!(%id, "missing connection")
+                    },
                 }
                 return Ok(());
             }
@@ -364,22 +385,33 @@ impl Server {
                 return Ok(());
             }
             
+            // Poll for new connections with a timeout to allow heartbeat checks
             const TIMEOUT: Duration = Duration::from_millis(500);
             if let Ok(result) = timeout(TIMEOUT, listener.accept()).await {
                 let (stream2, addr) = result?;
                 info!(?addr, ?port, "new connection");
 
+                // Generate unique ID for this connection to match client's Accept message
                 let id = Uuid::new_v4();
                 let conns = Arc::clone(&self.conns);
 
+                // Store the external client connection temporarily
                 conns.insert(id, stream2);
+                
+                // Spawn a cleanup task to prevent memory leaks from unaccepted connections
+                // If the bore client doesn't send Accept(id) within 10 seconds, we remove
+                // the stored connection. This handles cases where:
+                // - The bore client crashes or disconnects
+                // - Network issues prevent the Connection message from arriving
+                // - The client rejects the connection for any reason
                 tokio::spawn(async move {
-                    // Remove stale entries to avoid memory leaks.
                     sleep(Duration::from_secs(10)).await;
                     if conns.remove(&id).is_some() {
                         warn!(%id, "removed stale connection");
                     }
                 });
+                
+                // Notify bore client of the new connection
                 stream.send(ServerMessage::Connection(id)).await?;
             }
         }

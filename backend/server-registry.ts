@@ -165,7 +165,8 @@ export async function getActiveServers(): Promise<BoreServer[]> {
         const client: any = redisService.getClient();
         if (!client) return [];
         
-        const keys: string[] = await client.keys(`${REDIS_PREFIX}*`);
+        // Use SCAN instead of KEYS to avoid blocking Redis (production-safe)
+        const keys: string[] = await redisService.scanKeys(`${REDIS_PREFIX}*`);
         const serverPromises = keys.map(async (key: string) => {
           const data = await client.get(key);
           return data ? JSON.parse(data) as BoreServer : null;

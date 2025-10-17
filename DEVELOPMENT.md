@@ -12,7 +12,8 @@ Complete guide for developers contributing to the Bore project. Covers setup, ar
 6. [Coding Standards](#coding-standards)
 7. [Database Migrations](#database-migrations)
 8. [API Development](#api-development)
-9. [Contributing](#contributing)
+9. [API Versioning Strategy](#api-versioning-strategy)
+10. [Contributing](#contributing)
 
 ---
 
@@ -638,6 +639,265 @@ module.exports = (req, res, next) => {
   next();
 };
 ```
+
+---
+
+## API Versioning Strategy
+
+### Overview
+
+The Bore API uses **URL-based versioning** with a path prefix to maintain compatibility while allowing for API evolution. All endpoints are versioned under `/api/v1/`.
+
+**Current Version:** `v1` (OpenAPI 3.0.3)
+
+### Versioning Approach
+
+**URL Path Versioning:**
+```
+https://api.bore.com/api/v1/auth/login
+https://api.bore.com/api/v1/instances
+```
+
+**Key Principles:**
+1. **Explicit Versioning** - Version is visible in the URL path
+2. **Backward Compatibility** - Maintain compatibility within major versions
+3. **Clear Migration Path** - Provide deprecation notices and migration guides
+4. **Long-term Support** - Support previous major version for 12 months minimum
+
+### Version Lifecycle
+
+#### Version States
+
+1. **Active** - Current production version, receives all updates
+   - Example: `v1` (current)
+   
+2. **Deprecated** - Marked for removal, still functional
+   - Receives critical security fixes only
+   - Includes deprecation warnings in response headers
+   - Minimum 12-month notice before sunset
+   
+3. **Sunset** - No longer available
+   - Returns 410 Gone with migration information
+
+#### Version Header
+
+All API responses include version metadata:
+```http
+X-API-Version: 1.0.0
+X-API-Deprecation: false
+```
+
+For deprecated versions:
+```http
+X-API-Version: 1.0.0
+X-API-Deprecation: true
+X-API-Sunset-Date: 2025-12-31
+X-API-Migration-Guide: https://docs.bore.com/migration/v1-to-v2
+```
+
+### Backward Compatibility
+
+**Automatic Redirects:**
+
+Legacy endpoints without version prefix are automatically redirected to `v1`:
+
+```javascript
+// backend/server.ts
+app.use('/api/auth*', (req, res, next) => {
+  if (!req.path.startsWith('/api/v1/')) {
+    const newPath = req.path.replace('/api/', '/api/v1/');
+    return res.redirect(308, newPath); // HTTP 308 Permanent Redirect
+  }
+  next();
+});
+```
+
+**Supported Redirects:**
+- `/api/auth/*` → `/api/v1/auth/*`
+- `/api/instances/*` → `/api/v1/instances/*`
+- `/api/admin/*` → `/api/v1/admin/*`
+- `/api/internal/*` → `/api/v1/internal/*`
+
+**HTTP 308 (Permanent Redirect):**
+- Preserves original HTTP method (POST, PUT, etc.)
+- Signals to clients to update their URL permanently
+- Browsers and HTTP clients automatically follow
+
+### Breaking vs Non-Breaking Changes
+
+#### Non-Breaking Changes (Patch/Minor)
+
+Safe to implement within the same major version:
+
+✅ **Allowed:**
+- Adding new endpoints
+- Adding optional request parameters
+- Adding new fields to responses
+- Adding new response status codes
+- Improving error messages
+- Performance optimizations
+- Bug fixes
+
+**Example:**
+```javascript
+// Adding optional field - backward compatible
+router.post('/api/v1/instances', async (req, res) => {
+  const { name, localPort, region } = req.body; // 'region' is new but optional
+  // ... implementation
+});
+```
+
+#### Breaking Changes (Major)
+
+Require a new major version:
+
+❌ **Breaking:**
+- Removing or renaming endpoints
+- Removing request/response fields
+- Changing field types or formats
+- Making optional parameters required
+- Changing authentication mechanisms
+- Modifying error response structures
+- Changing default behavior
+
+**Example - Requires v2:**
+```javascript
+// v1 - current
+POST /api/v1/instances
+{ "name": "my-tunnel", "localPort": 3000 }
+
+// v2 - breaking change (renamed field)
+POST /api/v2/instances
+{ "name": "my-tunnel", "port": 3000 }  // 'localPort' → 'port'
+```
+
+### Introducing a New Version
+
+When creating `v2`:
+
+**1. Create New Routes:**
+```javascript
+// routes/v2/instances.js
+const express = require('express');
+const router = express.Router();
+
+router.post('/', async (req, res) => {
+  // New v2 implementation
+});
+
+module.exports = router;
+```
+
+**2. Register Routes:**
+```javascript
+// server.ts
+const instancesV1 = require('./routes/instances');
+const instancesV2 = require('./routes/v2/instances');
+
+app.use('/api/v1/instances', instancesV1);
+app.use('/api/v2/instances', instancesV2);
+```
+
+**3. Update OpenAPI Spec:**
+```yaml
+# backend/docs/openapi.yaml
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Version 1 (deprecated)
+  - url: http://localhost:3000/api/v2
+    description: Version 2 (current)
+```
+
+**4. Mark v1 as Deprecated:**
+```javascript
+// middleware/api-version.js
+app.use('/api/v1/*', (req, res, next) => {
+  res.setHeader('X-API-Deprecation', 'true');
+  res.setHeader('X-API-Sunset-Date', '2025-12-31');
+  res.setHeader('X-API-Migration-Guide', 'https://docs.bore.com/migration/v1-to-v2');
+  next();
+});
+```
+
+**5. Documentation:**
+- Update README.md with migration guide
+- Create MIGRATION.md documenting all breaking changes
+- Update client libraries and examples
+- Announce deprecation via changelog and release notes
+
+### Client Recommendations
+
+**For API Consumers:**
+
+1. **Always specify version explicitly:**
+   ```bash
+   # Good
+   curl https://api.bore.com/api/v1/instances
+   
+   # Avoid (relies on redirects)
+   curl https://api.bore.com/api/instances
+   ```
+
+2. **Monitor deprecation headers:**
+   ```javascript
+   const response = await fetch('/api/v1/instances');
+   if (response.headers.get('X-API-Deprecation') === 'true') {
+     console.warn('API version deprecated:', 
+       response.headers.get('X-API-Sunset-Date'));
+   }
+   ```
+
+3. **Pin to specific version in production:**
+   ```javascript
+   const API_BASE = process.env.API_URL || 'https://api.bore.com/api/v1';
+   ```
+
+4. **Test against new versions early:**
+   ```javascript
+   // Feature flag for testing v2
+   const apiVersion = process.env.USE_API_V2 ? 'v2' : 'v1';
+   const endpoint = `/api/${apiVersion}/instances`;
+   ```
+
+### Version Support Timeline
+
+| Version | Release Date | Status      | Support Until | Notes                    |
+|---------|--------------|-------------|---------------|--------------------------|
+| v1      | 2024-01-01   | Active      | TBD           | Current production API   |
+| v2      | TBD          | Planned     | -             | Breaking changes planned |
+
+### Future Considerations
+
+**Potential v2 Changes:**
+- Improved error response format with structured error codes
+- Standardized pagination across all list endpoints
+- GraphQL endpoint as alternative to REST
+- Webhook support for event notifications
+- Rate limit information in response headers
+
+**Alternative Versioning (Not Currently Used):**
+
+1. **Header-based:**
+   ```http
+   Accept: application/vnd.bore.v1+json
+   ```
+   
+2. **Query parameter:**
+   ```
+   /api/instances?version=v1
+   ```
+   
+3. **Subdomain:**
+   ```
+   https://v1.api.bore.com/instances
+   ```
+
+**Why URL-based versioning?**
+- ✅ Simple and explicit
+- ✅ Easy to test in browsers
+- ✅ Works with all HTTP clients
+- ✅ Clear in logs and analytics
+- ✅ No ambiguity
 
 ---
 

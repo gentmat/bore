@@ -2,6 +2,9 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { Server as HTTPServer } from 'http';
 import config from './config';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('websocket');
 
 interface SocketWithAuth extends Socket {
   userId?: string;
@@ -39,7 +42,7 @@ function initializeWebSocket(httpServer: HTTPServer, jwtSecret: string): Server 
         if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || NODE_ENV === 'development') {
           callback(null, true);
         } else {
-          console.warn(`⚠️  WebSocket CORS: Blocked connection from unauthorized origin: ${origin}`);
+          logger.warn('WebSocket CORS: Blocked connection from unauthorized origin', { origin });
           callback(new Error('Not allowed by CORS'));
         }
       },
@@ -71,7 +74,7 @@ function initializeWebSocket(httpServer: HTTPServer, jwtSecret: string): Server 
   // Connection handler
   io.on('connection', (socket: SocketWithAuth) => {
     const userId = socket.userId!;
-    console.log(`🔌 WebSocket client connected: ${userId}`);
+    logger.info('WebSocket client connected', { userId, socketId: socket.id });
     
     // Track user's sockets
     if (!userSockets.has(userId)) {
@@ -90,7 +93,7 @@ function initializeWebSocket(httpServer: HTTPServer, jwtSecret: string): Server 
     
     // Handle disconnect
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 WebSocket client disconnected: ${userId} (${reason})`);
+      logger.info('WebSocket client disconnected', { userId, socketId: socket.id, reason });
       const sockets = userSockets.get(userId);
       if (sockets) {
         sockets.delete(socket.id);
@@ -123,7 +126,7 @@ function initializeWebSocket(httpServer: HTTPServer, jwtSecret: string): Server 
     });
   });
   
-  console.log('✅ WebSocket server initialized');
+  logger.info('WebSocket server initialized');
   return io;
 }
 

@@ -1,0 +1,17 @@
+# Clippy Configuration
+# Defines linting rules for Rust code quality
+
+# Cognitive complexity threshold for functions
+cognitive-complexity-threshold = 50
+
+# Warn on missing documentation for public items
+# This is handled via #[warn(missing_docs)] in lib.rs
+
+# Allow certain lint groups that may be too noisy
+# We can adjust these based on actual project needs
+
+# Examples of other configurations:
+# type-complexity-threshold = 250
+# too-many-arguments-threshold = 7
+# too-many-lines-threshold = 100
+# large-error-threshold = 128

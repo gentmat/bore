@@ -49,11 +49,15 @@ impl Client {
     ) -> Result<Self> {
         let mut stream = Delimited::new(connect_with_timeout(to, CONTROL_PORT).await?);
         
-        // Check if secret looks like an API key (starts with sk_)
+        // Determine authentication mode based on secret format
+        // The client supports two modes:
+        // 1. API Key mode: secret starts with "sk_" - sent directly to backend for validation
+        // 2. Legacy HMAC mode: any other secret - uses challenge-response protocol
         let is_api_key = secret.map(|s| s.starts_with("sk_")).unwrap_or(false);
         
         let (api_key, auth) = if is_api_key {
-            // New mode: Send API key directly for backend validation
+            // API Key authentication mode (recommended)
+            // Protocol: Client sends Authenticate → Hello → Server responds with Hello
             if let Some(key) = secret {
                 info!("Authenticating with API key");
                 stream.send(ClientMessage::Authenticate(key.to_string())).await?;
@@ -62,7 +66,8 @@ impl Client {
                 (None, None)
             }
         } else {
-            // Legacy mode: Use HMAC challenge-response
+            // Legacy HMAC challenge-response authentication mode (deprecated)
+            // Protocol: Client sends Hello → Server may send Challenge → Client responds
             let auth = secret.map(Authenticator::new);
             if let Some(auth) = &auth {
                 warn!("Using legacy HMAC authentication (deprecated)");
@@ -75,17 +80,21 @@ impl Client {
         // Send Hello to request port
         stream.send(ClientMessage::Hello(port)).await?;
         
-        // Receive response - may be Hello or Challenge
+        // Handle server response - the protocol flow varies based on auth mode
+        // API Key mode: Server sends Hello immediately (already authenticated)
+        // Legacy mode: Server may send Challenge first, then Hello after auth
         let first_response = stream.recv_timeout().await?;
         
         let remote_port = match first_response {
             Some(ServerMessage::Challenge(_)) => {
-                // Server sent a challenge - we need to authenticate
+                // Server requires legacy HMAC authentication
+                // This happens when server has a shared secret configured
                 if let Some(ref authenticator) = auth {
                     info!("Received challenge, performing HMAC handshake");
+                    // Complete the challenge-response handshake
                     authenticator.client_handshake(&mut stream).await?;
                     
-                    // Now wait for the Hello message after successful auth
+                    // After successful authentication, server sends Hello with assigned port
                     match stream.recv_timeout().await? {
                         Some(ServerMessage::Hello(remote_port)) => remote_port,
                         Some(ServerMessage::Error(message)) => bail!("server error: {message}"),
@@ -93,10 +102,15 @@ impl Client {
                         None => bail!("unexpected EOF after authentication"),
                     }
                 } else {
+                    // Server requires auth but client has no secret configured
                     bail!("server requires authentication, but no client secret was provided");
                 }
             }
-            Some(ServerMessage::Hello(remote_port)) => remote_port,
+            Some(ServerMessage::Hello(remote_port)) => {
+                // Server accepted connection and assigned port immediately
+                // This is the normal flow for API key auth or no-auth mode
+                remote_port
+            }
             Some(ServerMessage::Error(message)) => bail!("server error: {message}"),
             Some(_) => bail!("unexpected initial non-hello message"),
             None => bail!("unexpected EOF"),
@@ -153,23 +167,37 @@ impl Client {
     }
 
     async fn handle_connection(&self, id: Uuid) -> Result<()> {
+        // Establish a new connection to the server for this tunnel session
         let mut remote_conn =
             Delimited::new(connect_with_timeout(&self.to[..], CONTROL_PORT).await?);
         
         // Authenticate if using API key or legacy auth
         if let Some(api_key) = &self.api_key {
-            // New mode: Send API key (but server won't check it again for Accept messages)
-            // We just send Accept directly
+            // API key mode: Server already validated us during initial connection
+            // Accept messages don't require re-authentication
         } else if let Some(auth) = &self.auth {
-            // Legacy mode: Do handshake
+            // Legacy mode: Each new connection requires HMAC handshake
             auth.client_handshake(&mut remote_conn).await?;
         }
         
+        // Tell server we're accepting this specific connection ID
         remote_conn.send(ClientMessage::Accept(id)).await?;
+        
+        // Connect to the local service being forwarded
         let mut local_conn = connect_with_timeout(&self.local_host, self.local_port).await?;
+        
+        // Extract the underlying TCP stream from the framed codec
+        // The codec may have buffered some data already received from the server
         let mut parts = remote_conn.into_parts();
         debug_assert!(parts.write_buf.is_empty(), "framed write buffer not empty");
-        local_conn.write_all(&parts.read_buf).await?; // mostly of the cases, this will be empty
+        
+        // Forward any buffered data to the local connection
+        // In most cases this is empty, but if the server sent data immediately,
+        // we need to forward it before starting bidirectional copy
+        local_conn.write_all(&parts.read_buf).await?;
+        
+        // Begin bidirectional forwarding between local and remote connections
+        // This continues until either side closes the connection
         tokio::io::copy_bidirectional(&mut local_conn, &mut parts.io).await?;
         Ok(())
     }

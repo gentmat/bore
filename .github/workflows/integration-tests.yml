@@ -1,0 +1,120 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bore_test
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+  NODE_ENV: test
+
+jobs:
+  integration-tests:
+    name: Full Integration Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bore_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+      
+      - name: Run database migrations
+        run: |
+          cd backend
+          npm run migrate:up || true
+      
+      - name: Start backend server
+        run: |
+          cd backend
+          npm start &
+          echo $! > backend.pid
+          sleep 5
+      
+      - name: Start bore-server
+        run: |
+          cargo build --release --bin bore-server
+          ./target/release/bore-server &
+          echo $! > bore-server.pid
+          sleep 2
+      
+      - name: Run Rust unit tests
+        run: cargo test --workspace --lib
+      
+      - name: Run Rust integration tests
+        run: cargo test --workspace --test '*' -- --ignored
+      
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm test
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f backend.pid ]; then
+            kill $(cat backend.pid) || true
+          fi
+          if [ -f bore-server.pid ]; then
+            kill $(cat bore-server.pid) || true
+          fi
+      
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            backend/test-results
+            target/debug/deps/*.log

@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "audit": "npm audit --audit-level=moderate",
+    "audit:fix": "npm audit fix",
+    "audit:prod": "npm audit --production --audit-level=moderate",
+    "outdated": "npm outdated",
+    "check:security": "npm audit && npm outdated"
+  },
+  "devDependencies": {
+    "snyk": "^1.1293.0"
+  },
+  "overrides": {
+    "comment": "Add security overrides here to force specific versions"
+  }
+}

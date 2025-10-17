@@ -10,6 +10,10 @@ documentation = "https://docs.rs/bore-client"
 keywords = ["network", "client", "tunnel", "tcp", "cli"]
 categories = ["network-programming", "web-programming", "command-line-utilities"]
 
+[lib]
+name = "bore_client"
+path = "src/lib.rs"
+
 [[bin]]
 name = "bore"
 path = "src/main.rs"

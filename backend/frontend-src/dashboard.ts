@@ -42,7 +42,7 @@ async function loadInstances(): Promise<void> {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/user/instances`, {
+        const response = await fetch(`${API_BASE}/api/v1/instances`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }

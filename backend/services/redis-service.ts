@@ -360,6 +360,9 @@ export async function shutdown(): Promise<void> {
   }
 }
 
+// Export scanKeys for use in other modules (non-blocking alternative to KEYS)
+export { scanKeys };
+
 // Default export for backward compatibility
 export default {
   initializeRedis,
@@ -369,5 +372,6 @@ export default {
   servers,
   tokenBlacklist,
   healthCheck,
-  shutdown
+  shutdown,
+  scanKeys
 };

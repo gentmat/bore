@@ -28,3 +28,10 @@ dist-ssr
 
 # Tauri
 /src-tauri/WixTools
+
+# Testing
+coverage
+.nyc_output
+playwright-report
+test-results
+*.lcov

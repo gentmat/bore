@@ -76,7 +76,7 @@ impl ApiClient {
 
     /// Login with email and password
     pub async fn login(&mut self, email: String, password: String) -> Result<LoginResponse> {
-        let url = format!("{}/api/auth/login", self.base_url);
+        let url = format!("{}/api/v1/auth/login", self.base_url);
         let request = LoginRequest { email, password };
 
         let response = self
@@ -113,7 +113,7 @@ impl ApiClient {
             .as_ref()
             .context("not authenticated. Please run 'bore login' first")?;
 
-        let url = format!("{}/api/user/instances", self.base_url);
+        let url = format!("{}/api/v1/instances", self.base_url);
 
         let response = self
             .client
@@ -153,7 +153,7 @@ impl ApiClient {
             .context("not authenticated. Please run 'bore login' first")?;
 
         let url = format!(
-            "{}/api/user/instances/{}/connect",
+            "{}/api/v1/instances/{}/connect",
             self.base_url, instance_id
         );
 
@@ -211,7 +211,7 @@ impl ApiClient {
     pub async fn send_heartbeat(&self, instance_id: &str) -> Result<()> {
         let token = self.auth_token.as_ref().context("not authenticated")?;
 
-        let url = format!("{}/api/instances/{}/heartbeat", self.base_url, instance_id);
+        let url = format!("{}/api/v1/instances/{}/heartbeat", self.base_url, instance_id);
 
         let response = self
             .client
@@ -268,7 +268,7 @@ impl ApiClient {
         }
 
         let url = format!(
-            "{}/api/user/instances/{}/connection",
+            "{}/api/v1/instances/{}/connection",
             self.base_url, instance_id
         );
 
@@ -293,7 +293,7 @@ impl ApiClient {
             .context("not authenticated. Please run 'bore login' first")?;
 
         let url = format!(
-            "{}/api/user/instances/{}/disconnect",
+            "{}/api/v1/instances/{}/disconnect",
             self.base_url, instance_id
         );
 

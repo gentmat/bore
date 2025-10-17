@@ -14,14 +14,20 @@ pub struct Authenticator(Hmac<Sha256>);
 impl Authenticator {
     /// Generate an authenticator from a secret.
     pub fn new(secret: &str) -> Self {
+        // Hash the secret with SHA256 first to ensure a uniform key distribution
+        // This prevents weak secrets from compromising the HMAC security
         let hashed_secret = Sha256::new().chain_update(secret).finalize();
+        // Create HMAC instance with the hashed secret as the key
         Self(Hmac::new_from_slice(&hashed_secret).expect("HMAC can take key of any size"))
     }
 
     /// Generate a reply message for a challenge.
     pub fn answer(&self, challenge: &Uuid) -> String {
+        // Clone the HMAC to avoid mutating the stored instance
         let mut hmac = self.0.clone();
+        // Update HMAC with the challenge UUID bytes
         hmac.update(challenge.as_bytes());
+        // Finalize and return hex-encoded MAC tag
         hex::encode(hmac.finalize().into_bytes())
     }
 
@@ -38,11 +44,15 @@ impl Authenticator {
     /// assert!(!auth.validate(&challenge, "wrong answer"));
     /// ```
     pub fn validate(&self, challenge: &Uuid, tag: &str) -> bool {
+        // Attempt to decode the hex-encoded tag
         if let Ok(tag) = hex::decode(tag) {
+            // Clone HMAC and compute expected tag for the challenge
             let mut hmac = self.0.clone();
             hmac.update(challenge.as_bytes());
+            // Use constant-time comparison to prevent timing attacks
             hmac.verify_slice(&tag).is_ok()
         } else {
+            // Invalid hex encoding always fails validation
             false
         }
     }

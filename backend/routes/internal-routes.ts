@@ -3,7 +3,7 @@ import config from '../config';
 import { db } from '../database';
 import { requireInternalApiKey } from '../auth-middleware';
 import { incrementCounter } from '../metrics';
-import { instanceHeartbeats } from './instance-routes';
+import { setHeartbeat, deleteHeartbeat } from './instance-routes';
 import { schemas, validate } from '../middleware/validation';
 import { ErrorResponses } from '../utils/error-handler';
 import { logger } from '../utils/logger';
@@ -67,8 +67,12 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
     }
     
     const user = await db.getUserById(tokenInfo.user_id);
-    const planType = user?.plan || 'trial';
-    const maxConcurrent = planType === 'pro' ? 5 : 1;
+    const planType = (user?.plan || 'trial') as keyof typeof config.plans;
+    
+    // Derive limits from config.plans for proper multi-tier support
+    const planConfig = config.plans[planType] || config.plans.trial;
+    const maxConcurrent = planConfig.maxConcurrentTunnels;
+    const maxBandwidth = planConfig.maxBandwidthGb;
     
     res.json({
       valid: true,
@@ -76,7 +80,7 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
       user_id: tokenInfo.user_id,
       plan_type: planType,
       max_concurrent_tunnels: maxConcurrent,
-      max_bandwidth_gb: 999,
+      max_bandwidth_gb: maxBandwidth,
       instance_id: instance.id,
       message: 'Token validated'
     } as ValidationResponse);
@@ -123,7 +127,8 @@ router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(s
     await db.updateInstance(instance.id, updates);
     await db.addStatusHistory(instance.id, 'active', 'Tunnel connected from bore-server');
     
-    instanceHeartbeats.set(instance.id, Date.now());
+    // Use Redis-aware heartbeat setter for multi-node support
+    await setHeartbeat(instance.id, Date.now());
     incrementCounter('tunnelConnectionsTotal');
     
     // Signal to broadcast
@@ -159,7 +164,8 @@ router.post('/instances/:id/tunnel-disconnected', requireInternalApiKey, async (
     
     await db.addStatusHistory(instance.id, 'offline', 'Tunnel disconnected from bore-server');
     
-    instanceHeartbeats.delete(instance.id);
+    // Use Redis-aware heartbeat deletion for multi-node support
+    await deleteHeartbeat(instance.id);
     
     // Delete tunnel token if exists
     const currentToken = instance.current_tunnel_token || instance.currentTunnelToken;

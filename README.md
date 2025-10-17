@@ -290,9 +290,16 @@ cargo test --workspace
 
 ## 📚 Documentation
 
+### Core Documentation
 - **API Documentation**: `backend/docs/openapi.yaml` - OpenAPI 3.0 specification
-- **Deployment Guide**: See `DEPLOYMENT.md` for production deployment
-- **Development Guide**: See `DEVELOPMENT.md` for contributing
+- **Deployment Guide**: `DEPLOYMENT.md` - Production deployment instructions
+- **Development Guide**: `DEVELOPMENT.md` - Contributing and development setup
+
+### Additional Resources
+- **Troubleshooting Guide**: `TROUBLESHOOTING.md` - Solutions to common problems
+- **Quick Reference**: `QUICK_REFERENCE.md` - Fast access guide for developers
+- **Changelog**: `CHANGELOG.md` - Version history and upgrade guides
+- **Improvements Summary**: `IMPROVEMENTS_SUMMARY.md` - Recent enhancements and impact
 
 ## 🤝 Contributing
 

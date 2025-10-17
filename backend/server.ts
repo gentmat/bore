@@ -338,10 +338,13 @@ app.use(globalErrorHandler); // Handle all other errors
 
 /**
  * Periodic heartbeat timeout check (Redis-aware)
+ * 
+ * Performance optimization: Only checks instances that have active heartbeats
+ * instead of querying all instances from the database. This scales better with
+ * hundreds or thousands of instances.
  */
 setInterval(async () => {
   try {
-    const instances = await db.getAllInstances();
     const now = Date.now();
     
     // Get all heartbeats from Redis or fallback
@@ -352,11 +355,13 @@ setInterval(async () => {
       heartbeatMap = instanceHeartbeats;
     }
     
-    for (const instance of instances) {
-      const lastHeartbeat = heartbeatMap.get(instance.id);
-      if (lastHeartbeat && (now - lastHeartbeat) > config.heartbeat.timeout) {
-        const oldStatus = instance.status;
-        if (oldStatus !== 'offline') {
+    // Only check instances that have heartbeats (active instances)
+    // This is much more efficient than querying ALL instances from the database
+    for (const [instanceId, lastHeartbeat] of heartbeatMap.entries()) {
+      if ((now - lastHeartbeat) > config.heartbeat.timeout) {
+        // Heartbeat timed out - fetch instance details and mark offline
+        const instance = await db.getInstanceById(instanceId);
+        if (instance && instance.status !== 'offline') {
           await db.updateInstance(instance.id, { 
             status: 'offline',
             status_reason: 'Heartbeat timeout'

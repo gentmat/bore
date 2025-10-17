@@ -1,5 +1,8 @@
 import https from 'https';
 import { db } from './database';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('alerting');
 
 interface AlertConfig {
   slackWebhookUrl: string | null;
@@ -117,7 +120,7 @@ function canSendAlert(instanceId: string): boolean {
 async function sendAlert(instanceId: string, instanceName: string, alertType: string, message: string): Promise<void> {
   // Check cooldown to avoid spam
   if (!canSendAlert(instanceId)) {
-    console.log(`Alert cooldown active for ${instanceId}, skipping`);
+    logger.debug(`Alert cooldown active for ${instanceId}, skipping`, { instanceId });
     return;
   }
   
@@ -129,9 +132,9 @@ async function sendAlert(instanceId: string, instanceName: string, alertType: st
   if (config.slackWebhookUrl) {
     try {
       await sendSlackAlert(fullMessage, getAlertColor(alertType));
-      console.log(`✅ Slack alert sent for ${instanceId}`);
+      logger.info('Slack alert sent successfully', { instanceId, instanceName, alertType });
     } catch (error) {
-      console.error(`❌ Failed to send Slack alert:`, (error as Error).message);
+      logger.error('Failed to send Slack alert', error as Error, { instanceId, instanceName, alertType });
     }
   }
   
@@ -140,9 +143,9 @@ async function sendAlert(instanceId: string, instanceName: string, alertType: st
     try {
       const subject = `[Bore Alert] ${alertType}: ${instanceName}`;
       await sendEmailAlert(subject, fullMessage);
-      console.log(`✅ Email alert sent for ${instanceId}`);
+      logger.info('Email alert sent successfully', { instanceId, instanceName, alertType });
     } catch (error) {
-      console.error(`❌ Failed to send email alert:`, (error as Error).message);
+      logger.error('Failed to send email alert', error as Error, { instanceId, instanceName, alertType });
     }
   }
   
@@ -150,7 +153,7 @@ async function sendAlert(instanceId: string, instanceName: string, alertType: st
   try {
     await db.saveAlert(instanceId, alertType, message);
   } catch (error) {
-    console.error(`❌ Failed to save alert to database:`, (error as Error).message);
+    logger.error('Failed to save alert to database', error as Error, { instanceId, alertType });
   }
 }
 

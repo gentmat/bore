@@ -203,7 +203,8 @@ impl BackendClient {
                 server_id: server_id.to_string(),
             })
             .send()
-            .await?;
+            .await?
+            .error_for_status()?; // Propagate HTTP errors (4xx/5xx)
 
         #[derive(Deserialize)]
         struct SessionResponse {
@@ -232,7 +233,8 @@ impl BackendClient {
                 bytes_transferred,
             })
             .send()
-            .await?;
+            .await?
+            .error_for_status()?; // Propagate HTTP errors (4xx/5xx)
 
         Ok(())
     }
@@ -244,7 +246,10 @@ impl BackendClient {
 
         let mut last_error: Option<Error> = None;
 
+        // Retry loop with exponential backoff to handle transient network failures
+        // and temporary backend unavailability
         for attempt in 0..RETRY_ATTEMPTS {
+            // Build the request for this attempt
             let mut request = self.request(Method::POST, path);
             if let Some(payload) = body {
                 request = request.json(payload);
@@ -253,6 +258,7 @@ impl BackendClient {
             match request.send().await {
                 Ok(response) if response.status().is_success() => return Ok(()),
                 Ok(response) => {
+                    // Backend returned an HTTP error status
                     let status = response.status();
                     let text = response.text().await.unwrap_or_default();
                     warn!(
@@ -264,6 +270,7 @@ impl BackendClient {
                     last_error = Some(anyhow!("backend responded with status {status}: {text}"));
                 }
                 Err(err) => {
+                    // Network error or connection failure
                     warn!(
                         attempt = attempt + 1,
                         path = %path,
@@ -274,12 +281,15 @@ impl BackendClient {
                 }
             }
 
+            // Exponential backoff: delay increases with each retry attempt
+            // attempt 0: 300ms, attempt 1: 600ms, attempt 2: 900ms, etc.
             if attempt + 1 < RETRY_ATTEMPTS {
                 let delay = Duration::from_millis(RETRY_DELAY_MS * (attempt as u64 + 1));
                 sleep(delay).await;
             }
         }
 
+        // All retry attempts exhausted
         Err(last_error.unwrap_or_else(|| {
             anyhow!(
                 "backend POST {} failed after {} attempts",

@@ -1,0 +1,31 @@
+# Cargo Audit Configuration
+# Run with: cargo audit
+
+[advisories]
+# Severity threshold for failing the audit
+# Options: "None", "Low", "Medium", "High", "Critical"
+severity-threshold = "Low"
+
+# Ignore specific advisories by ID
+ignore = [
+    # Example: "RUSTSEC-2020-0071",
+]
+
+[database]
+# Fetch the advisory database from GitHub
+fetch = true
+# Use a local database path (optional)
+# path = "~/.cargo/advisory-db"
+
+[output]
+# Output format: "human", "json", "toml"
+format = "human"
+# Show detailed information
+verbose = false
+# Use color output
+color = "auto"
+
+[target]
+# Only check dependencies for specific targets
+# arch = "x86_64"
+# os = "linux"

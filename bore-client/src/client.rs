@@ -30,9 +30,11 @@ pub struct Client {
     remote_port: u16,
 
     /// Optional API key for backend authentication.
+    #[allow(dead_code)]
     api_key: Option<String>,
 
     /// Optional secret used to authenticate clients (legacy).
+    #[allow(dead_code)]
     auth: Option<Authenticator>,
 }
 
@@ -51,13 +53,21 @@ impl Client {
     ) -> Result<Self> {
         let mut stream = Delimited::new(connect_with_timeout(to, CONTROL_PORT).await?);
 
-        // Check if secret looks like an API key (starts with sk_)
-        let is_api_key = secret.map(|s| s.starts_with("sk_")).unwrap_or(false);
+        // Determine authentication mode based on secret format:
+        // - API keys start with "sk_" or "tk_" (tunnel token prefix)
+        // - Everything else uses legacy HMAC challenge-response
+        // 
+        // CRITICAL: Do NOT use 64-char hex heuristic! Many legacy deployments use
+        // openssl rand -hex 32, which produces 64-char hex but expects HMAC flow.
+        // Misdetecting these as "modern" breaks authentication completely.
+        let is_modern_auth = secret
+            .map(|s| s.starts_with("sk_") || s.starts_with("tk_"))
+            .unwrap_or(false);
 
-        let (api_key, auth) = if is_api_key {
-            // New mode: Send API key directly for backend validation
+        let (api_key, auth): (Option<String>, Option<Authenticator>) = if is_modern_auth {
+            // Modern mode: Send Authenticate message for backend validation
             if let Some(key) = secret {
-                info!("Authenticating with API key");
+                info!("Authenticating with API key or tunnel token");
                 stream
                     .send(ClientMessage::Authenticate(key.to_string()))
                     .await?;
@@ -83,11 +93,14 @@ impl Client {
         let first_response = stream.recv_timeout().await?;
         
         let remote_port = match first_response {
-            Some(ServerMessage::Challenge(_)) => {
+            Some(ServerMessage::Challenge(challenge)) => {
                 // Server sent a challenge - we need to authenticate
+                // We already consumed the Challenge, so manually perform HMAC response
+                // instead of calling client_handshake (which would wait for another Challenge)
                 if let Some(ref authenticator) = auth {
-                    info!("Received challenge, performing HMAC handshake");
-                    authenticator.client_handshake(&mut stream).await?;
+                    info!("Received challenge, performing HMAC response");
+                    let tag = authenticator.answer(&challenge);
+                    stream.send(ClientMessage::Authenticate(tag)).await?;
                     
                     // Now wait for the Hello message after successful auth
                     match stream.recv_timeout().await? {
@@ -109,9 +122,9 @@ impl Client {
         info!(remote_port, "connected to server");
         info!("listening at {to}:{remote_port}");
 
-        // Only show public URL in legacy mode (when not using managed instances)
-        // In managed mode, the start command handles the output
-        if !is_api_key {
+        // Only show public URL when not using modern authentication (standalone/legacy mode)
+        // In managed mode (API keys/tunnel tokens), the start command handles the output
+        if api_key.is_none() {
             println!("\n✓ Tunnel established!");
             println!("  Public URL: {to}:{remote_port}");
             println!("  Forwarding to: {local_host}:{local_port}\n");
@@ -166,14 +179,11 @@ impl Client {
         let mut remote_conn =
             Delimited::new(connect_with_timeout(&self.to[..], CONTROL_PORT).await?);
 
-        // Authenticate if using API key or legacy auth
-        if self.api_key.is_some() {
-            // New mode: Send API key (but server won't check it again for Accept messages)
-            // We just send Accept directly
-        } else if let Some(auth) = &self.auth {
-            // Legacy mode: Do handshake
-            auth.client_handshake(&mut remote_conn).await?;
-        }
+        // Note: Accept connections don't need authentication.
+        // The control connection is already authenticated, and the server's Accept path
+        // doesn't perform authentication (it just expects ClientMessage::Accept immediately).
+        // Attempting to authenticate here would cause a timeout because the server won't
+        // send a Challenge for Accept messages.
 
         remote_conn.send(ClientMessage::Accept(id)).await?;
         let mut local_conn = connect_with_timeout(&self.local_host, self.local_port).await?;

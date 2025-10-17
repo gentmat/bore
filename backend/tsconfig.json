@@ -5,9 +5,9 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     
-    // Allow JavaScript files for gradual migration
-    "allowJs": true,
-    "checkJs": false,  // Don't type-check JS files initially
+    // TypeScript migration complete - only TypeScript files
+    "allowJs": false,
+    "checkJs": false,
     
     // Output configuration
     "outDir": "./dist",
@@ -57,6 +57,7 @@
     "**/*.test.js",
     "**/*.test.ts",
     "public",
+    "frontend-src",
     "**/*.js"
   ]
 }

@@ -21,3 +21,9 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+bore-client = { path = "../bore-client" }
+bore-server = { path = "../bore-server" }
+lazy_static = "1.4"
+rstest = "0.18"

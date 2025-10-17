@@ -3,7 +3,11 @@
  * Creates all core tables and indexes
  */
 
-exports.up = (pgm) => {
+import { MigrationBuilder, ColumnDefinitions } from 'node-pg-migrate';
+
+export const shorthands: ColumnDefinitions | undefined = undefined;
+
+export async function up(pgm: MigrationBuilder): Promise<void> {
   // Users table
   pgm.createTable('users', {
     id: { type: 'varchar(50)', primaryKey: true },
@@ -16,13 +20,13 @@ exports.up = (pgm) => {
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
+      default: pgm.func('current_timestamp'),
     },
     updated_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('users', 'email', { name: 'idx_users_email' });
@@ -35,7 +39,7 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'users(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     name: { type: 'varchar(255)', notNull: true },
     local_port: { type: 'integer', notNull: true },
@@ -52,20 +56,20 @@ exports.up = (pgm) => {
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
+      default: pgm.func('current_timestamp'),
     },
     updated_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('instances', 'user_id', { name: 'idx_instances_user_id' });
   pgm.createIndex('instances', ['status', 'user_id'], { name: 'idx_instances_status' });
   pgm.createIndex('instances', ['region', 'status'], { name: 'idx_instances_region' });
   pgm.createIndex('instances', 'tunnel_connected', { name: 'idx_instances_tunnel_connected' });
-  pgm.createIndex('instances', 'created_at', { name: 'idx_instances_created_at', method: 'btree', order: 'DESC' });
+  pgm.createIndex('instances', 'created_at', { name: 'idx_instances_created_at', method: 'btree' });
 
   // Status history table
   pgm.createTable('status_history', {
@@ -74,21 +78,20 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'instances(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     status: { type: 'varchar(50)', notNull: true },
     reason: { type: 'text' },
     timestamp: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('status_history', ['instance_id', 'timestamp'], { 
     name: 'idx_instance_timestamp',
     method: 'btree',
-    order: 'DESC'
   });
 
   // Health metrics table
@@ -98,7 +101,7 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'instances(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     vscode_responsive: { type: 'boolean' },
     cpu_usage: { type: 'float' },
@@ -108,14 +111,13 @@ exports.up = (pgm) => {
     timestamp: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('health_metrics', ['instance_id', 'timestamp'], {
     name: 'idx_instance_latest',
     method: 'btree',
-    order: 'DESC'
   });
 
   // Tunnel tokens table
@@ -125,20 +127,20 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'instances(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     user_id: {
       type: 'varchar(50)',
       notNull: true,
       references: 'users(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     expires_at: { type: 'timestamp', notNull: true },
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('tunnel_tokens', 'instance_id', { name: 'idx_tunnel_tokens_instance' });
@@ -151,21 +153,20 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'instances(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     alert_type: { type: 'varchar(50)', notNull: true },
     message: { type: 'text', notNull: true },
     sent_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('alert_history', ['instance_id', 'sent_at'], {
     name: 'idx_instance_sent',
     method: 'btree',
-    order: 'DESC'
   });
 
   // Bore servers table
@@ -180,13 +181,13 @@ exports.up = (pgm) => {
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
+      default: pgm.func('current_timestamp'),
     },
     updated_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   // Waitlist table
@@ -201,8 +202,8 @@ exports.up = (pgm) => {
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('waitlist', ['status', 'position'], { name: 'idx_status_position' });
@@ -215,7 +216,7 @@ exports.up = (pgm) => {
       type: 'varchar(50)',
       notNull: true,
       references: 'users(id)',
-      onDelete: 'CASCADE'
+      onDelete: 'CASCADE',
     },
     user_agent: { type: 'text' },
     ip_address: { type: 'varchar(45)' },
@@ -225,19 +226,19 @@ exports.up = (pgm) => {
     created_at: {
       type: 'timestamp',
       notNull: true,
-      default: pgm.func('current_timestamp')
-    }
+      default: pgm.func('current_timestamp'),
+    },
   });
 
   pgm.createIndex('refresh_tokens', ['user_id', 'revoked', 'expires_at'], {
-    name: 'idx_user_token'
+    name: 'idx_user_token',
   });
   pgm.createIndex('refresh_tokens', ['token', 'revoked', 'expires_at'], {
-    name: 'idx_token_lookup'
+    name: 'idx_token_lookup',
   });
-};
+}
 
-exports.down = (pgm) => {
+export async function down(pgm: MigrationBuilder): Promise<void> {
   // Drop tables in reverse order (respecting foreign key constraints)
   pgm.dropTable('refresh_tokens');
   pgm.dropTable('waitlist');
@@ -248,4 +249,4 @@ exports.down = (pgm) => {
   pgm.dropTable('status_history');
   pgm.dropTable('instances');
   pgm.dropTable('users');
-};
+}

@@ -11,7 +11,7 @@ import type { PlainObject } from './utils/naming-convention';
 
 type QueryParams = unknown[];
 
-interface UserRecord {
+interface UserRecord extends Record<string, unknown> {
   id: string;
   email: string;
   passwordHash: string;
@@ -23,7 +23,7 @@ interface UserRecord {
   updatedAt: string | Date;
 }
 
-interface InstanceRecord {
+interface InstanceRecord extends Record<string, unknown> {
   id: string;
   userId: string;
   name: string;
@@ -42,7 +42,7 @@ interface InstanceRecord {
   updatedAt: string | Date;
 }
 
-interface StatusHistoryRecord {
+interface StatusHistoryRecord extends Record<string, unknown> {
   id: number;
   instanceId: string;
   status: string;
@@ -58,7 +58,7 @@ interface HealthMetricsInput {
   last_activity?: number;
 }
 
-interface HealthMetricsRecord {
+interface HealthMetricsRecord extends Record<string, unknown> {
   id: number;
   instanceId: string;
   vscodeResponsive: boolean | null;
@@ -69,7 +69,7 @@ interface HealthMetricsRecord {
   timestamp: string | Date;
 }
 
-interface TunnelTokenRecord {
+interface TunnelTokenRecord extends Record<string, unknown> {
   token: string;
   instanceId: string;
   userId: string;
@@ -77,7 +77,7 @@ interface TunnelTokenRecord {
   createdAt: string | Date;
 }
 
-interface AlertRecord {
+interface AlertRecord extends Record<string, unknown> {
   id: number;
   instanceId: string;
   alertType: string;
@@ -85,19 +85,42 @@ interface AlertRecord {
   sentAt: string | Date;
 }
 
-function mapRequiredRow<T>(row: PlainObject | undefined, context: string): T {
+/**
+ * Maps a required database row to a typed object.
+ * Throws if row is undefined.
+ * Note: Type safety is enforced by TypeScript at compile time,
+ * but runtime validation should be added for production use.
+ */
+function mapRequiredRow<T extends Record<string, unknown>>(
+  row: PlainObject | undefined,
+  context: string
+): T {
   if (!row) {
     throw new Error(`Expected database row for ${context} but query returned none.`);
   }
-  return formatDbRow(row) as unknown as T;
+  // formatDbRow converts snake_case to camelCase
+  const formatted = formatDbRow(row);
+  return formatted as T;
 }
 
-function mapOptionalRow<T>(row: PlainObject | undefined): T | undefined {
-  return row ? (formatDbRow(row) as unknown as T) : undefined;
+/**
+ * Maps an optional database row to a typed object or undefined.
+ */
+function mapOptionalRow<T extends Record<string, unknown>>(
+  row: PlainObject | undefined
+): T | undefined {
+  if (!row) return undefined;
+  const formatted = formatDbRow(row);
+  return formatted as T;
 }
 
-function mapRows<T>(rows: PlainObject[]): T[] {
-  return formatDbRows(rows) as unknown as T[];
+/**
+ * Maps an array of database rows to typed objects.
+ */
+function mapRows<T extends Record<string, unknown>>(rows: PlainObject[]): T[] {
+  if (!rows || rows.length === 0) return [];
+  const formatted = formatDbRows(rows);
+  return formatted as T[];
 }
 
 interface Database {

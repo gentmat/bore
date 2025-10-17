@@ -2,12 +2,12 @@
   "name": "bore-backend",
   "version": "1.0.0",
   "description": "Backend API for Bore Tunnel Management",
-  "main": "server.js",
+  "main": "server.ts",
   "scripts": {
-    "start": "node server.js",
-    "start:ts": "npm run build && node dist/server.js",
-    "dev": "nodemon server.js",
-    "dev:ts": "ts-node server.ts",
+    "start": "ts-node server.ts",
+    "start:prod": "npm run build && node dist/server.js",
+    "dev": "nodemon --exec ts-node server.ts",
+    "dev:watch": "nodemon --watch '**/*.ts' --exec ts-node server.ts",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config tests/e2e/jest.config.js",
@@ -26,10 +26,10 @@
     "type-check:watch": "tsc --noEmit --watch",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
-    "migrate": "node-pg-migrate -m migrations -c database.config.js",
-    "migrate:up": "node-pg-migrate up -m migrations -c database.config.js",
-    "migrate:down": "node-pg-migrate down -m migrations -c database.config.js",
-    "migrate:create": "node-pg-migrate create -m migrations -c database.config.js"
+    "migrate": "node -r ts-node/register node_modules/.bin/node-pg-migrate -m migrations -c database.config.ts",
+    "migrate:up": "node -r ts-node/register node_modules/.bin/node-pg-migrate up -m migrations -c database.config.ts",
+    "migrate:down": "node -r ts-node/register node_modules/.bin/node-pg-migrate down -m migrations -c database.config.ts",
+    "migrate:create": "node -r ts-node/register node_modules/.bin/node-pg-migrate create -m migrations -c database.config.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -57,6 +57,8 @@
     "@types/node": "^20.10.0",
     "@types/pg": "^8.10.9",
     "@types/supertest": "^6.0.2",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/yamljs": "^0.2.34",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "esbuild": "^0.19.11",
@@ -71,13 +73,15 @@
     "yamljs": "^0.3.0"
   },
   "jest": {
+    "preset": "ts-jest",
     "testEnvironment": "node",
     "coverageDirectory": "./coverage",
     "collectCoverageFrom": [
-      "**/*.js",
+      "**/*.ts",
       "!node_modules/**",
       "!coverage/**",
-      "!jest.config.js"
+      "!dist/**",
+      "!**/*.d.ts"
     ]
   }
 }

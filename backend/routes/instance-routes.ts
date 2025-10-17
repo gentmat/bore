@@ -141,7 +141,8 @@ router.get('/', authenticateJWT, async (req: Request, res: Response): Promise<vo
       };
     }));
     
-    res.json(withHeartbeat);
+    // Wrap in object for client compatibility
+    res.json({ instances: withHeartbeat });
   } catch (error) {
     logger.error('List instances error', error as Error);
     ErrorResponses.internalError(res, 'Failed to list instances', (req as AuthRequest).id);
@@ -305,8 +306,9 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request,
       await db.deleteTunnelToken(instance.currentTunnelToken);
     }
     
-    // Generate new tunnel token
-    const tunnelToken = crypto.randomBytes(32).toString('hex');
+    // Generate new tunnel token with tk_ prefix
+    // Prefix distinguishes tunnel tokens from legacy shared secrets (which may also be hex)
+    const tunnelToken = 'tk_' + crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + config.tokens.tunnel.expiresIn);
     
     await db.saveTunnelToken(tunnelToken, instance.id, authReq.user.user_id, expiresAt);
@@ -317,10 +319,21 @@ router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request,
     });
     
     res.json({
+      // Required fields for Rust client (snake_case)
+      instance_id: instance.id,
+      tunnel_token: tunnelToken,
+      server_host: bestServer.host,
+      server_port: bestServer.port,
+      local_port: instance.localPort,
+      remote_port: 0, // Will be set when tunnel connects
+      expires_at: expiresAt.toISOString(),
+      // Also include camelCase for TypeScript/JavaScript clients
+      instanceId: instance.id,
       tunnelToken: tunnelToken,
       boreServerHost: bestServer.host,
       boreServerPort: bestServer.port,
       localPort: instance.localPort,
+      remotePort: 0,
       expiresAt: expiresAt.toISOString(),
       serverInfo: {
         serverId: bestServer.id,
@@ -384,7 +397,7 @@ router.get('/:id/status-history', authenticateJWT, async (req: Request, res: Res
     
     const history = await db.getStatusHistory(instance.id);
     const healthMetrics = await db.getLatestHealthMetrics(instance.id);
-    const lastHeartbeat = instanceHeartbeats.get(instance.id);
+    const lastHeartbeat = await getHeartbeat(instance.id);
     
     res.json({
       instanceId: instance.id,
@@ -415,7 +428,7 @@ router.get('/:id/health', authenticateJWT, async (req: Request, res: Response): 
     }
     
     const healthMetrics = await db.getLatestHealthMetrics(instance.id);
-    const lastHeartbeat = instanceHeartbeats.get(instance.id);
+    const lastHeartbeat = await getHeartbeat(instance.id);
     
     res.json({
       instanceId: instance.id,
@@ -437,7 +450,7 @@ router.get('/:id/health', authenticateJWT, async (req: Request, res: Response): 
  */
 async function determineInstanceStatus(instance: Instance): Promise<{ status: string; reason: string }> {
   const now = Date.now();
-  const lastHeartbeat = instanceHeartbeats.get(instance.id);
+  const lastHeartbeat = await getHeartbeat(instance.id);
   const healthMetrics = await db.getLatestHealthMetrics(instance.id) || {} as HealthMetrics;
   
   if (instance.tunnelConnected === false || instance.status === 'offline') {
@@ -464,16 +477,21 @@ async function determineInstanceStatus(instance: Instance): Promise<{ status: st
  */
 function calculateUptimeMetrics(history: StatusHistoryRecord[]): UptimeMetrics {
   if (!history || history.length === 0) {
-    return { uptimePercentage: '0', totalDowntimeMs: 0, incidentCount: 0 };
+    return { uptimePercentage: '0', totalDowntimeMs: 0, incidentCount: 0, historySpanMs: 0 };
   }
+  
+  // Database returns history in DESC order (newest first), but we need ascending 
+  // (oldest first) for proper duration calculation: next.timestamp - current.timestamp
+  const sortedHistory = [...history].reverse();
   
   let totalTime = 0;
   let uptimeMs = 0;
   let incidentCount = 0;
   
-  for (let i = 0; i < history.length - 1; i++) {
-    const current = history[i];
-    const next = history[i + 1];
+  // Calculate intervals between status changes
+  for (let i = 0; i < sortedHistory.length - 1; i++) {
+    const current = sortedHistory[i];
+    const next = sortedHistory[i + 1];
     
     if (next && current) {
       const duration = new Date(next.timestamp).getTime() - new Date(current.timestamp).getTime();
@@ -489,6 +507,23 @@ function calculateUptimeMetrics(history: StatusHistoryRecord[]): UptimeMetrics {
     }
   }
   
+  // Include trailing segment: from last status entry to now
+  // This is critical for accurate uptime calculation
+  // After reversing, the last entry in sortedHistory is the most recent
+  const lastEntry = sortedHistory[sortedHistory.length - 1];
+  if (lastEntry) {
+    const now = Date.now();
+    const lastTimestamp = new Date(lastEntry.timestamp).getTime();
+    const trailingDuration = now - lastTimestamp;
+    
+    totalTime += trailingDuration;
+    
+    // Add to uptime if last status was online/active
+    if (lastEntry.status === 'online' || lastEntry.status === 'active') {
+      uptimeMs += trailingDuration;
+    }
+  }
+  
   const uptimePercentage = totalTime > 0 ? (uptimeMs / totalTime) * 100 : 0;
   
   return {
@@ -499,4 +534,4 @@ function calculateUptimeMetrics(history: StatusHistoryRecord[]): UptimeMetrics {
   };
 }
 
-export { router, instanceHeartbeats };
+export { router, instanceHeartbeats, setHeartbeat, deleteHeartbeat };

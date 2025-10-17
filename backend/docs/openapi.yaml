@@ -4,6 +4,25 @@ info:
   description: |
     REST API for managing TCP tunnels through bore-server infrastructure.
     Provides user authentication, instance management, and real-time status monitoring.
+    
+    ## API Versioning
+    
+    This API uses URL-based versioning with the `/api/v1/` prefix. All endpoints are versioned
+    to ensure backward compatibility and smooth migration paths.
+    
+    **Current Version:** v1 (Active)
+    
+    **Versioning Strategy:**
+    - New endpoints and optional fields can be added without breaking changes
+    - Breaking changes will result in a new major version (e.g., v2)
+    - Previous major versions are supported for a minimum of 12 months after deprecation
+    - Deprecated versions include `X-API-Deprecation` headers with sunset dates
+    
+    **Legacy Support:**
+    - Unversioned endpoints (e.g., `/api/auth/*`) automatically redirect to `/api/v1/*` using HTTP 308
+    - Clients should explicitly use versioned endpoints in production
+    
+    For detailed versioning documentation, see the [Development Guide](../../DEVELOPMENT.md#api-versioning-strategy).
   version: 1.0.0
   contact:
     name: Bore Support
