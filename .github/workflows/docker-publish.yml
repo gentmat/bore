@@ -139,16 +139,16 @@ jobs:
       - name: Test docker-compose build
         working-directory: backend
         run: |
-          docker-compose config
-          docker-compose build
+          docker compose config
+          docker compose build
 
       - name: Test docker-compose up
         working-directory: backend
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 10
-          docker-compose ps
-          docker-compose logs
+          docker compose ps
+          docker compose logs
 
       - name: Health check
         run: |
@@ -157,4 +157,4 @@ jobs:
       - name: Cleanup
         if: always()
         working-directory: backend
-        run: docker-compose down -v
+        run: docker compose down -v

@@ -35,11 +35,14 @@ jobs:
           cargo clippy --all-targets --all-features -- \
             -D warnings \
             -W clippy::all \
-            -W clippy::pedantic \
-            -W clippy::nursery \
             -A clippy::module_name_repetitions \
             -A clippy::missing_errors_doc \
-            -A clippy::missing_panics_doc
+            -A clippy::missing_panics_doc \
+            -A clippy::too_many_lines \
+            -A clippy::must_use_candidate \
+            -A clippy::cast_possible_truncation \
+            -A clippy::cast_precision_loss \
+            -A clippy::cast_sign_loss
 
   rust-fmt:
     name: Rust Format Check

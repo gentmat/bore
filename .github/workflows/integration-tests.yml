@@ -70,10 +70,17 @@ jobs:
           cd backend
           npm ci
       
-      - name: Run database migrations
+      - name: Setup database
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: bore_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          NODE_ENV: test
         run: |
           cd backend
-          npm run migrate:up || true
+          npm run migrate:up
       
       - name: Start backend server
         env:
