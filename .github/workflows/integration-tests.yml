@@ -113,19 +113,7 @@ jobs:
           # Check if server started successfully
           curl -f http://localhost:3000/health || exit 1
       
-      - name: Start bore-server
-        env:
-          RUST_LOG: info
-          BORE_BACKEND_URL: http://localhost:3000
-          BORE_BACKEND_API_KEY: test-internal-key
-        run: |
-          cargo build --release --bin bore-server
-          ./target/release/bore-server &
-          echo $! > bore-server.pid
-          sleep 5
-          # Verify bore-server is running
-          ps -p $(cat bore-server.pid) || exit 1
-      
+            
       - name: Run Rust unit tests
         run: cargo test --workspace --lib
       
@@ -142,9 +130,6 @@ jobs:
         run: |
           if [ -f backend.pid ]; then
             kill $(cat backend.pid) || true
-          fi
-          if [ -f bore-server.pid ]; then
-            kill $(cat bore-server.pid) || true
           fi
       
       - name: Upload test results
