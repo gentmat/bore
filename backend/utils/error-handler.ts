@@ -3,6 +3,7 @@
  * Provides consistent error formatting across all API endpoints
  */
 
+/// <reference path="../types/express.d.ts" />
 import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 

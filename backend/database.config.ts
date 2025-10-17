@@ -33,11 +33,11 @@ const getDatabaseConfig = () => {
     const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
     if (match) {
       return {
-        host: match[3],
-        port: parseInt(match[4], 10),
-        database: match[5],
-        user: match[1],
-        password: match[2],
+        host: match[3] || 'localhost',
+        port: parseInt(match[4] || '5432', 10),
+        database: match[5] || 'bore_db',
+        user: match[1] || 'postgres',
+        password: match[2] || 'postgres',
       };
     }
   }
