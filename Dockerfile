@@ -8,3 +8,4 @@ FROM scratch
 COPY --from=builder /usr/local/cargo/bin/bore .
 USER 1000:1000
 ENTRYPOINT ["./bore"]
+# Triggering fresh Docker workflow

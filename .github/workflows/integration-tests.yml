@@ -144,3 +144,4 @@ jobs:
           path: |
             backend/test-results
             target/debug/deps/*.log
+# Updated workflow configuration
