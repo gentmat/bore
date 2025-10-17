@@ -15,6 +15,9 @@ use bore_shared::{Authenticator, ClientMessage, Delimited, ServerMessage, CONTRO
 
 use crate::backend::BackendClient;
 
+/// Timeout for polling new connections while allowing heartbeat checks.
+const HEARTBEAT_POLL_TIMEOUT: Duration = Duration::from_millis(500);
+
 /// State structure for the server.
 pub struct Server {
     /// Range of TCP ports that can be forwarded.
@@ -340,7 +343,7 @@ impl Server {
             .handle_tunnel_session(stream, user_id, instance_id, requested_port, max_tunnels)
             .await
         {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(err) => {
                 warn!(%err, "Tunnel session error");
                 Err(err)
@@ -402,8 +405,7 @@ impl Server {
 
         if !limit_ok {
             stream.send(ServerMessage::Error(format!(
-                "Maximum concurrent tunnels ({}) reached. Please disconnect an existing tunnel or upgrade your plan.",
-                max_tunnels
+                "Maximum concurrent tunnels ({max_tunnels}) reached. Please disconnect an existing tunnel or upgrade your plan."
             ))).await?;
             return Ok(());
         }
@@ -541,8 +543,7 @@ impl Server {
             }
 
             // Poll for new connections with a timeout to allow heartbeat checks
-            const TIMEOUT: Duration = Duration::from_millis(500);
-            if let Ok(result) = timeout(TIMEOUT, listener.accept()).await {
+            if let Ok(result) = timeout(HEARTBEAT_POLL_TIMEOUT, listener.accept()).await {
                 let (stream2, addr) = result?;
                 info!(?addr, ?port, "new connection");
 
