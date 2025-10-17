@@ -134,15 +134,15 @@ clean:
 # Docker
 docker-build:
 	@echo "🐳 Building Docker images..."
-	docker-compose build
+	cd backend && docker-compose build
 
 docker-up:
 	@echo "🐳 Starting Docker services..."
-	docker-compose up -d
+	cd backend && docker-compose up -d --build
 
 docker-down:
 	@echo "🐳 Stopping Docker services..."
-	docker-compose down
+	cd backend && docker-compose down
 
 # Monitoring
 monitoring-setup:
