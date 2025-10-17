@@ -133,7 +133,7 @@ class Logger {
   /**
    * HTTP request logging
    */
-  http(req: Request, res: Response, duration: number): void {
+  http(req: Request & { id?: string; user?: { user_id: string } }, res: Response, duration: number): void {
     const logData: HttpLogData = {
       method: req.method,
       path: req.path,

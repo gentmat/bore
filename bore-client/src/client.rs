@@ -113,7 +113,13 @@ impl Client {
                     bail!("server requires authentication, but no client secret was provided");
                 }
             }
-            Some(ServerMessage::Hello(remote_port)) => remote_port,
+            Some(ServerMessage::Hello(remote_port)) => {
+                // Security check: if client has legacy auth configured, server MUST challenge
+                if auth.is_some() {
+                    bail!("server accepted connection without authentication challenge");
+                }
+                remote_port
+            }
             Some(ServerMessage::Error(message)) => bail!("server error: {message}"),
             Some(_) => bail!("unexpected initial non-hello message"),
             None => bail!("unexpected EOF"),
