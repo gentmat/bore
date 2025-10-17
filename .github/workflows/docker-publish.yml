@@ -104,7 +104,14 @@ jobs:
 
       - name: Create Dockerfile for ${{ matrix.component }}
         run: |
-          cat > Dockerfile.${{ matrix.component }} << 'EOF'
+          # Set binary name (bore-client produces 'bore' binary, bore-server produces 'bore-server')
+          if [ "${{ matrix.component }}" = "bore-client" ]; then
+            BINARY_NAME="bore"
+          else
+            BINARY_NAME="${{ matrix.component }}"
+          fi
+          
+          cat > Dockerfile.${{ matrix.component }} << EOF
           FROM rust:1.82-slim as builder
           
           RUN apt-get update && apt-get install -y \
@@ -125,8 +132,8 @@ jobs:
               ca-certificates \
               libssl3 \
               && rm -rf /var/lib/apt/lists/*
-          COPY --from=builder /app/target/release/${{ matrix.component }} /usr/local/bin/
-          ENTRYPOINT ["${{ matrix.component }}"]
+          COPY --from=builder /app/target/release/${BINARY_NAME} /usr/local/bin/
+          ENTRYPOINT ["${BINARY_NAME}"]
           EOF
 
       - name: Build and push ${{ matrix.component }} image
