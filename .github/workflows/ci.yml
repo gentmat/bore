@@ -54,7 +54,7 @@ jobs:
   backend:
     name: Backend Tests
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15
@@ -87,8 +87,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
@@ -150,7 +150,6 @@ jobs:
           NODE_ENV: test
         run: |
           npm run test:unit
-          npm run test:integration
 
       - name: Security audit
         working-directory: backend
@@ -161,35 +160,35 @@ jobs:
   gui:
     name: GUI Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: bore-gui/package-lock.json
-      
+
       - name: Install dependencies
         working-directory: bore-gui
         run: npm ci
-      
+
       - name: Run unit tests
         working-directory: bore-gui
         run: npm run test:coverage
         continue-on-error: true
-      
+
       - name: Install Playwright
         working-directory: bore-gui
         run: npx playwright install --with-deps chromium
-      
+
       - name: Run E2E tests
         working-directory: bore-gui
         run: npm run test:e2e
         continue-on-error: true
-      
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -202,7 +201,7 @@ jobs:
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15
@@ -235,8 +234,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
       - name: Setup Rust
@@ -316,7 +315,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -393,7 +392,7 @@ jobs:
             target: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-    
+
     steps:
       - uses: actions/checkout@v4
 
