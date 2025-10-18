@@ -133,7 +133,7 @@ router.get('/', authenticateJWT, async (req: Request, res: Response): Promise<vo
     const instances = await db.getInstancesByUserId(authReq.user.user_id);
     
     // Add heartbeat age to each instance (using camelCase)
-    const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(instances.map(async (instance: Instance) => {
+    const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(instances.map(async (instance) => {
       const lastHeartbeat = await getHeartbeat(instance.id);
       return {
         ...instance,
