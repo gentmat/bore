@@ -15,6 +15,7 @@ COPY Cargo.toml Cargo.lock ./
 
 # Copy all workspace members
 COPY bore-shared ./bore-shared/
+COPY bore-server ./bore-server/
 COPY bore-client ./bore-client/
 
 # Build bore-client from workspace root
