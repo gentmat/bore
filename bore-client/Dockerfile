@@ -43,3 +43,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Set entrypoint
 ENTRYPOINT ["bore-client"]
+```
+
+Now let me update the GitHub workflow to use the dedicated client Dockerfile:

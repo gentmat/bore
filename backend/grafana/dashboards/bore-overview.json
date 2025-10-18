@@ -27,7 +27,7 @@
       "title": "Bore Documentation",
       "tooltip": "",
       "type": "link",
-      "url": "https://github.com/ekzhang/bore"
+      "url": "https://github.com/gentmat/bore"
     }
   ],
   "liveNow": false,
@@ -331,10 +331,7 @@
   "refresh": "15s",
   "schemaVersion": 36,
   "style": "dark",
-  "tags": [
-    "bore",
-    "overview"
-  ],
+  "tags": ["bore", "overview"],
   "templating": {
     "list": []
   },

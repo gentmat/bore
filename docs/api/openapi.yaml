@@ -31,7 +31,7 @@ info:
   contact:
     name: Bore Team
     email: support@bore.example.com
-    url: https://github.com/ekzhang/bore
+    url: https://github.com/gentmat/bore
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -51,12 +51,12 @@ paths:
       description: Returns the health status of the API service
       operationId: healthCheck
       responses:
-        '200':
+        "200":
           description: Service is healthy
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: "#/components/schemas/HealthResponse"
 
   /api/v1/auth/register:
     post:
@@ -70,18 +70,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: User registered successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/v1/auth/login:
     post:
@@ -95,18 +95,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Login successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /api/v1/auth/me:
     get:
@@ -118,14 +118,14 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: User details retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserDetailsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/UserDetailsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/auth/logout:
     post:
@@ -137,14 +137,14 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: Logout successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/instances:
     get:
@@ -156,21 +156,21 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/Status'
-        - $ref: '#/components/parameters/ServerId'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-        - $ref: '#/components/parameters/Sort'
-        - $ref: '#/components/parameters/Order'
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/ServerId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Order"
       responses:
-        '200':
+        "200":
           description: List of instances
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstanceListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/InstanceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
     post:
       tags:
@@ -185,20 +185,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateInstanceRequest'
+              $ref: "#/components/schemas/CreateInstanceRequest"
       responses:
-        '201':
+        "201":
           description: Instance created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstanceResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
+                $ref: "#/components/schemas/InstanceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/instances/{instanceId}:
     get:
@@ -210,18 +210,18 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/InstanceId'
+        - $ref: "#/components/parameters/InstanceId"
       responses:
-        '200':
+        "200":
           description: Instance details retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstanceDetailsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/InstanceDetailsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
     put:
       tags:
@@ -232,26 +232,26 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/InstanceId'
+        - $ref: "#/components/parameters/InstanceId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateInstanceRequest'
+              $ref: "#/components/schemas/UpdateInstanceRequest"
       responses:
-        '200':
+        "200":
           description: Instance updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstanceResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/InstanceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
     delete:
       tags:
@@ -262,14 +262,14 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/InstanceId'
+        - $ref: "#/components/parameters/InstanceId"
       responses:
-        '204':
+        "204":
           description: Instance deleted successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/instances/{instanceId}/status:
     put:
@@ -282,26 +282,26 @@ paths:
         - BearerAuth: []
         - InternalApiKey: []
       parameters:
-        - $ref: '#/components/parameters/InstanceId'
+        - $ref: "#/components/parameters/InstanceId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateStatusRequest'
+              $ref: "#/components/schemas/UpdateStatusRequest"
       responses:
-        '200':
+        "200":
           description: Status updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/instances/{instanceId}/logs:
     get:
@@ -313,21 +313,21 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/InstanceId'
-        - $ref: '#/components/parameters/LogLimit'
-        - $ref: '#/components/parameters/LogLevel'
-        - $ref: '#/components/parameters/Since'
+        - $ref: "#/components/parameters/InstanceId"
+        - $ref: "#/components/parameters/LogLimit"
+        - $ref: "#/components/parameters/LogLevel"
+        - $ref: "#/components/parameters/Since"
       responses:
-        '200':
+        "200":
           description: Logs retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LogsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/LogsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/servers:
     get:
@@ -339,14 +339,14 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of servers
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServerListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/ServerListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/servers/register:
     post:
@@ -362,20 +362,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterServerRequest'
+              $ref: "#/components/schemas/RegisterServerRequest"
       responses:
-        '201':
+        "201":
           description: Server registered successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServerResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/ServerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/v1/servers/{serverId}/heartbeat:
     post:
@@ -387,26 +387,26 @@ paths:
       security:
         - InternalApiKey: []
       parameters:
-        - $ref: '#/components/parameters/ServerId'
+        - $ref: "#/components/parameters/ServerId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/HeartbeatRequest'
+              $ref: "#/components/schemas/HeartbeatRequest"
       responses:
-        '200':
+        "200":
           description: Heartbeat received
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/servers/{serverId}:
     get:
@@ -418,18 +418,18 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/ServerId'
+        - $ref: "#/components/parameters/ServerId"
       responses:
-        '200':
+        "200":
           description: Server details retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ServerDetailsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/ServerDetailsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/metrics/system:
     get:
@@ -441,14 +441,14 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: System metrics retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SystemMetricsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/SystemMetricsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/metrics/user:
     get:
@@ -460,14 +460,14 @@ paths:
       security:
         - BearerAuth: []
       responses:
-        '200':
+        "200":
           description: User metrics retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserMetricsResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/UserMetricsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /metrics:
     get:
@@ -477,7 +477,7 @@ paths:
       description: Returns metrics in Prometheus format for monitoring systems
       operationId: getPrometheusMetrics
       responses:
-        '200':
+        "200":
           description: Prometheus metrics
           content:
             text/plain:
@@ -492,7 +492,7 @@ paths:
       description: WebSocket endpoint for real-time instance updates
       operationId: instanceWebSocket
       responses:
-        '101':
+        "101":
           description: WebSocket connection established
 
 components:
@@ -619,7 +619,7 @@ components:
           type: string
           example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         user:
-          $ref: '#/components/schemas/UserResponse'
+          $ref: "#/components/schemas/UserResponse"
         expires_in:
           type: integer
           example: 3600
@@ -761,7 +761,7 @@ components:
 
     InstanceDetailsResponse:
       allOf:
-        - $ref: '#/components/schemas/InstanceResponse'
+        - $ref: "#/components/schemas/InstanceResponse"
         - type: object
           properties:
             updated_at:
@@ -811,7 +811,7 @@ components:
         instances:
           type: array
           items:
-            $ref: '#/components/schemas/InstanceResponse'
+            $ref: "#/components/schemas/InstanceResponse"
         pagination:
           type: object
           properties:
@@ -923,7 +923,7 @@ components:
 
     ServerDetailsResponse:
       allOf:
-        - $ref: '#/components/schemas/ServerResponse'
+        - $ref: "#/components/schemas/ServerResponse"
         - type: object
           properties:
             active_instances:
@@ -946,7 +946,7 @@ components:
         servers:
           type: array
           items:
-            $ref: '#/components/schemas/ServerResponse'
+            $ref: "#/components/schemas/ServerResponse"
 
     SystemMetricsResponse:
       type: object
@@ -1188,7 +1188,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: VALIDATION_ERROR
@@ -1202,7 +1202,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: UNAUTHORIZED
@@ -1214,7 +1214,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: FORBIDDEN
@@ -1226,7 +1226,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: NOT_FOUND
@@ -1238,7 +1238,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: CONFLICT
@@ -1250,7 +1250,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/Error"
           example:
             error:
               code: RATE_LIMITED
