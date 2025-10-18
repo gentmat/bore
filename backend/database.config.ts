@@ -28,7 +28,7 @@ interface MigrationConfig {
 // In CI environments, completely ignore DATABASE_URL and only use explicit variables
 const getDatabaseConfig = () => {
   const databaseUrl = process.env.DATABASE_URL;
-  const isCI = process.env.CI === 'true';
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
   // In CI, ALWAYS use explicit environment variables and completely ignore DATABASE_URL
   if (isCI) {

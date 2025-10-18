@@ -65,7 +65,7 @@ interface HealthMetrics {
  * Status history record
  */
 interface StatusHistoryRecord {
-  id: string;
+  id: number;
   instanceId: string;
   status: string;
   reason: string | null;
@@ -137,6 +137,9 @@ router.get('/', authenticateJWT, async (req: Request, res: Response): Promise<vo
       const lastHeartbeat = await getHeartbeat(instance.id);
       return {
         ...instance,
+        tunnelTokenExpiresAt: instance.tunnelTokenExpiresAt ? new Date(instance.tunnelTokenExpiresAt) : null,
+        createdAt: new Date(instance.createdAt),
+        updatedAt: new Date(instance.updatedAt),
         lastHeartbeat: lastHeartbeat,
         heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null
       };
