@@ -245,6 +245,7 @@ jobs:
       - name: Setup database
         working-directory: backend
         env:
+          CI: true
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: bore_test
@@ -371,6 +372,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install musl tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Cache cargo
         uses: actions/cache@v4

@@ -12,6 +12,7 @@
     "test:watch": "jest --watch",
     "test:e2e": "jest --config tests/e2e/jest.config.js",
     "test:unit": "jest --testPathIgnorePatterns=e2e --coverage",
+    "test:integration": "jest --testPathPattern=integration --coverage",
     "test:all": "npm run test:unit && npm run test:e2e",
     "seed:test": "node tests/fixtures/seed.js seed",
     "seed:clear": "node tests/fixtures/seed.js clear",
