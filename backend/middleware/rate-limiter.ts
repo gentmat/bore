@@ -57,7 +57,12 @@ const tunnelLimiter = rateLimit({
       return req.user.user_id;
     }
     // Use a simple IP-based fallback that doesn't trigger IPv6 validation
-    return req.ip?.replace(/^::ffff:/, "") || "unknown";
+    const ip =
+      req.ip ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      "unknown";
+    return ip.toString();
   },
 });
 
@@ -77,7 +82,12 @@ const createInstanceLimiter = rateLimit({
       return req.user.user_id;
     }
     // Use a simple IP-based fallback that doesn't trigger IPv6 validation
-    return req.ip?.replace(/^::ffff:/, "") || "unknown";
+    const ip =
+      req.ip ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      "unknown";
+    return ip.toString();
   },
 });
 

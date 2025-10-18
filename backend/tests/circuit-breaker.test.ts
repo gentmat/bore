@@ -105,7 +105,8 @@ describe("Circuit Breaker", () => {
       // Fast-forward past reset timeout
       jest.advanceTimersByTime(6000);
 
-      await breaker.execute(mockFunction);
+      const promise = breaker.execute(mockFunction);
+      await promise;
 
       expect(breaker.getState()).toBe("HALF_OPEN");
 
@@ -129,6 +130,9 @@ describe("Circuit Breaker", () => {
 
       // Move to half-open
       jest.advanceTimersByTime(6000);
+    });
+
+    afterEach(() => {
       jest.useRealTimers();
     });
 
@@ -153,6 +157,8 @@ describe("Circuit Breaker", () => {
 
   describe("Timeout handling", () => {
     it("should timeout long-running operations", async () => {
+      jest.useFakeTimers();
+
       const slowFunction = jest.fn(
         () =>
           new Promise<string>((resolve) => {
@@ -160,13 +166,22 @@ describe("Circuit Breaker", () => {
           }),
       );
 
-      await expect(breaker.execute(slowFunction)).rejects.toThrow("timed out");
+      const promise = breaker.execute(slowFunction);
+
+      // Fast-forward past timeout
+      jest.advanceTimersByTime(2000);
+
+      await expect(promise).rejects.toThrow("timed out");
 
       const stats = breaker.getStats();
       expect(stats.timeouts).toBe(1);
+
+      jest.useRealTimers();
     });
 
     it("should not timeout fast operations", async () => {
+      jest.useFakeTimers();
+
       const fastFunction = jest.fn(
         () =>
           new Promise<string>((resolve) => {
@@ -174,11 +189,18 @@ describe("Circuit Breaker", () => {
           }),
       );
 
-      const result = await breaker.execute(fastFunction);
+      const promise = breaker.execute(fastFunction);
+
+      // Fast-forward to resolve
+      jest.advanceTimersByTime(150);
+
+      const result = await promise;
 
       expect(result).toBe("done");
       const stats = breaker.getStats();
       expect(stats.timeouts).toBe(0);
+
+      jest.useRealTimers();
     });
   });
 

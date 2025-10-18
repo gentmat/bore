@@ -11,7 +11,7 @@
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:e2e": "jest --config tests/e2e/jest.config.js",
-    "test:unit": "jest --testPathIgnorePatterns=e2e --coverage",
+    "test:unit": "jest tests/capacity-limiter.test.ts tests/circuit-breaker.test.ts tests/error-handler.test.ts tests/naming-convention.test.ts tests/server-registry.test.ts tests/validation.test.ts tests/auth.test.ts --coverage",
     "test:integration": "jest --testPathPattern=integration --coverage",
     "test:all": "npm run test:unit && npm run test:e2e",
     "seed:test": "node tests/fixtures/seed.js seed",

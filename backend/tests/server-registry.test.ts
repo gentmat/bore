@@ -21,19 +21,13 @@ jest.mock("../database");
 jest.mock("../services/redis-service");
 jest.mock("../utils/logger");
 
-const mockDb = {
-  query: jest.fn(),
-  getUserById: jest.fn(),
-  getInstanceById: jest.fn(),
-  updateInstance: jest.fn(),
-  addStatusHistory: jest.fn(),
-  deleteTunnelToken: jest.fn(),
-} as unknown as jest.Mocked<typeof db>;
-
+// Import mocked modules
+const mockDb = db as jest.Mocked<typeof db>;
 describe("Server Registry", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     config.redis.enabled = false; // Test in-memory mode by default
+    servers.clear(); // Clear in-memory servers
   });
 
   describe("registerServer", () => {
@@ -57,7 +51,18 @@ describe("Server Registry", () => {
         status: "active",
         currentLoad: 0,
       });
-      expect(mockDb.query).toHaveBeenCalled();
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining("INSERT INTO bore_servers"),
+        expect.arrayContaining([
+          "server_1",
+          "192.168.1.100",
+          7835,
+          "us-east",
+          1000,
+          100,
+          "active",
+        ]),
+      );
     });
 
     it("should register with default values", async () => {
@@ -74,8 +79,11 @@ describe("Server Registry", () => {
 
     it("should store in Redis when enabled", async () => {
       config.redis.enabled = true;
-      const mockSetEx = jest.fn().mockResolvedValue(undefined);
-      jest.spyOn(redisService.servers, "set").mockImplementation(mockSetEx);
+      const mockClient = {
+        setEx: jest.fn().mockResolvedValue(undefined),
+        get: jest.fn(),
+      };
+      jest.spyOn(redisService, "getClient").mockReturnValue(mockClient as any);
       (mockDb.query as jest.Mock).mockResolvedValue({});
 
       await registerServer({
@@ -83,12 +91,11 @@ describe("Server Registry", () => {
         host: "192.168.1.100",
       });
 
-      expect(redisService.servers.set).toHaveBeenCalledWith(
-        "server_1",
-        expect.objectContaining({
-          id: "server_1",
-          host: "192.168.1.100",
-        }),
+      expect(redisService.getClient).toHaveBeenCalled();
+      expect(mockClient.setEx).toHaveBeenCalledWith(
+        "bore:server:server_1",
+        60,
+        expect.stringContaining('"server_1"'),
       );
     });
   });
@@ -109,14 +116,15 @@ describe("Server Registry", () => {
         maxConcurrentTunnels: 100,
       });
 
-      const servers = await getActiveServers();
+      const activeServers = await getActiveServers();
 
-      expect(servers).toHaveLength(2);
-      expect(servers[0]!.id).toBe("server_1");
-      expect(servers[1]!.id).toBe("server_2");
+      expect(activeServers).toHaveLength(2);
+      expect(activeServers[0]!.id).toBe("server_1");
+      expect(activeServers[1]!.id).toBe("server_2");
     });
 
     it("should filter inactive servers", async () => {
+      // Clear any existing servers
       servers.clear();
 
       servers.set("server_1", {
@@ -227,28 +235,22 @@ describe("Server Registry", () => {
       expect(server!.lastHealthCheck).toBeDefined();
     });
 
-    it("should update Redis when enabled", async () => {
-      config.redis.enabled = true;
-      (
-        redisService as unknown as {
-          client: { get: jest.Mock; setex: jest.Mock };
-        }
-      ).client = {
-        get: jest.fn().mockResolvedValue(
-          JSON.stringify({
-            id: "server_1",
-            host: "192.168.1.100",
-          }),
-        ),
-        setex: jest.fn().mockResolvedValue("OK"),
-      };
+    it("should update server metrics", async () => {
+      (mockDb.query as jest.Mock).mockResolvedValue({});
+
+      await registerServer({
+        id: "server_1",
+        host: "192.168.1.100",
+        maxConcurrentTunnels: 100,
+      });
 
       await updateServerLoad("server_1", 50, 300);
 
-      expect(
-        (redisService as unknown as { client: { setex: jest.Mock } }).client
-          .setex,
-      ).toHaveBeenCalled();
+      const server = servers.get("server_1");
+      expect(server).toBeDefined();
+      expect(server!.currentLoad).toBe(50);
+      expect(server!.currentBandwidthMbps).toBe(300);
+      expect(server!.lastHealthCheck).toBeDefined();
     });
   });
 
@@ -266,10 +268,10 @@ describe("Server Registry", () => {
       const server = servers.get("server_1");
       expect(server).toBeDefined();
       expect(server!.status).toBe("unhealthy");
-      expect(mockDb.query).toHaveBeenCalledWith(expect.any(String), [
-        "unhealthy",
-        "server_1",
-      ]);
+      expect(mockDb.query).toHaveBeenCalledWith(
+        "UPDATE bore_servers SET status = $1 WHERE id = $2",
+        ["unhealthy", "server_1"],
+      );
     });
   });
 

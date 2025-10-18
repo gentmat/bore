@@ -9,25 +9,32 @@ import {
   requireCapacity,
   getCapacityStats,
 } from "../capacity-limiter";
-import { db } from "../database";
-import { getFleetStats } from "../server-registry";
 import { Request, Response, NextFunction } from "express";
 import { CapacityInfo } from "../capacity-limiter";
 
 // Mock dependencies
-jest.mock("../database");
-jest.mock("../server-registry");
+jest.mock("../database", () => ({
+  db: {
+    query: jest.fn(),
+    getUserById: jest.fn(),
+    getInstanceById: jest.fn(),
+    updateInstance: jest.fn(),
+    addStatusHistory: jest.fn(),
+    deleteTunnelToken: jest.fn(),
+  },
+}));
+
+jest.mock("../server-registry", () => ({
+  getFleetStats: jest.fn(),
+}));
+
 jest.mock("../utils/logger");
 
-const mockDb = {
-  query: jest.fn(),
-  getUserById: jest.fn(),
-  getInstanceById: jest.fn(),
-  updateInstance: jest.fn(),
-  addStatusHistory: jest.fn(),
-  deleteTunnelToken: jest.fn(),
-} as unknown as jest.Mocked<typeof db>;
+// Import mocked modules
+import { db } from "../database";
+import { getFleetStats } from "../server-registry";
 
+const mockDb = db as jest.Mocked<typeof db>;
 const mockGetFleetStats = getFleetStats as jest.MockedFunction<
   typeof getFleetStats
 >;
@@ -115,14 +122,24 @@ describe("Capacity Limiter", () => {
 
   describe("checkUserQuota", () => {
     it("should allow user under quota", async () => {
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({
+      mockDb.getUserById.mockResolvedValue({
         id: "user_123",
+        email: "test@example.com",
+        passwordHash: "hash",
+        name: "Test User",
         plan: "pro",
-      });
+        isAdmin: false,
+        planExpires: null,
+        createdAt: new Date(),
+      } as any);
 
-      (mockDb.query as jest.Mock).mockResolvedValue({
+      mockDb.query.mockResolvedValue({
         rows: [{ count: "2" }],
-      });
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      } as any);
 
       const result = await checkUserQuota("user_123");
 
@@ -132,14 +149,24 @@ describe("Capacity Limiter", () => {
     });
 
     it("should reject user at quota", async () => {
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({
+      mockDb.getUserById.mockResolvedValue({
         id: "user_123",
+        email: "test@example.com",
+        passwordHash: "hash",
+        name: "Test User",
         plan: "trial",
-      });
+        isAdmin: false,
+        planExpires: null,
+        createdAt: new Date(),
+      } as any);
 
-      (mockDb.query as jest.Mock).mockResolvedValue({
+      mockDb.query.mockResolvedValue({
         rows: [{ count: "1" }],
-      });
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      } as any);
 
       const result = await checkUserQuota("user_123");
 
@@ -150,14 +177,24 @@ describe("Capacity Limiter", () => {
     });
 
     it("should handle enterprise plan", async () => {
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({
+      mockDb.getUserById.mockResolvedValue({
         id: "user_123",
+        email: "test@example.com",
+        passwordHash: "hash",
+        name: "Test User",
         plan: "enterprise",
-      });
+        isAdmin: false,
+        planExpires: null,
+        createdAt: new Date(),
+      } as any);
 
-      (mockDb.query as jest.Mock).mockResolvedValue({
+      mockDb.query.mockResolvedValue({
         rows: [{ count: "15" }],
-      });
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      } as any);
 
       const result = await checkUserQuota("user_123");
 
@@ -166,7 +203,7 @@ describe("Capacity Limiter", () => {
     });
 
     it("should handle user not found", async () => {
-      (mockDb.getUserById as jest.Mock).mockResolvedValue(null);
+      mockDb.getUserById.mockResolvedValue(null as any);
 
       const result = await checkUserQuota("user_nonexistent");
 
@@ -175,7 +212,7 @@ describe("Capacity Limiter", () => {
     });
 
     it("should handle database errors", async () => {
-      (mockDb.getUserById as jest.Mock).mockRejectedValue(
+      mockDb.getUserById.mockRejectedValue(
         new Error("Database connection lost"),
       );
 
@@ -215,8 +252,23 @@ describe("Capacity Limiter", () => {
         servers: [],
       });
 
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: "pro" });
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: "1" }] });
+      mockDb.getUserById.mockResolvedValue({
+        id: "user_123",
+        email: "test@example.com",
+        passwordHash: "hash",
+        name: "Test User",
+        plan: "pro",
+        isAdmin: false,
+        planExpires: null,
+        createdAt: new Date(),
+      } as any);
+      mockDb.query.mockResolvedValue({
+        rows: [{ count: "1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      } as any);
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 
@@ -259,8 +311,23 @@ describe("Capacity Limiter", () => {
         servers: [],
       });
 
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: "trial" });
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: "1" }] });
+      mockDb.getUserById.mockResolvedValue({
+        id: "user_123",
+        email: "test@example.com",
+        passwordHash: "hash",
+        name: "Test User",
+        plan: "trial",
+        isAdmin: false,
+        planExpires: null,
+        createdAt: new Date(),
+      } as any);
+      mockDb.query.mockResolvedValue({
+        rows: [{ count: "1" }],
+        command: "SELECT",
+        rowCount: 1,
+        oid: 0,
+        fields: [],
+      } as any);
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 
