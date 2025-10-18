@@ -28,7 +28,7 @@ const mockDb = {
   updateInstance: jest.fn(),
   addStatusHistory: jest.fn(),
   deleteTunnelToken: jest.fn(),
-} as jest.Mocked<typeof db>;
+} as unknown as jest.Mocked<typeof db>;
 
 describe("Server Registry", () => {
   beforeEach(() => {
@@ -230,7 +230,9 @@ describe("Server Registry", () => {
     it("should update Redis when enabled", async () => {
       config.redis.enabled = true;
       (
-        redisService as { client: { get: jest.Mock; setex: jest.Mock } }
+        redisService as unknown as {
+          client: { get: jest.Mock; setex: jest.Mock };
+        }
       ).client = {
         get: jest.fn().mockResolvedValue(
           JSON.stringify({
@@ -244,7 +246,8 @@ describe("Server Registry", () => {
       await updateServerLoad("server_1", 50, 300);
 
       expect(
-        (redisService as { client: { setex: jest.Mock } }).client.setex,
+        (redisService as unknown as { client: { setex: jest.Mock } }).client
+          .setex,
       ).toHaveBeenCalled();
     });
   });

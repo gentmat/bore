@@ -26,7 +26,7 @@ const mockDb = {
   updateInstance: jest.fn(),
   addStatusHistory: jest.fn(),
   deleteTunnelToken: jest.fn(),
-} as jest.Mocked<typeof db>;
+} as unknown as jest.Mocked<typeof db>;
 
 const mockGetFleetStats = getFleetStats as jest.MockedFunction<
   typeof getFleetStats

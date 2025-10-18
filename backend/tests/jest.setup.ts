@@ -4,12 +4,12 @@
  */
 
 // Set test environment variables
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-jwt-secret-key';
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
-process.env.REDIS_HOST = 'localhost';
-process.env.REDIS_PORT = '6379';
-process.env.REDIS_ENABLED = 'false';
+process.env.NODE_ENV = "test";
+process.env.JWT_SECRET = "test-jwt-secret-key";
+process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_db";
+process.env.REDIS_HOST = "localhost";
+process.env.REDIS_PORT = "6379";
+process.env.REDIS_ENABLED = "false";
 
 // Mock console methods to reduce noise in tests
 const originalConsoleError = console.error;
@@ -19,7 +19,7 @@ beforeAll(() => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.error = (...args: any[]) => {
     // Only show error logs in test failures
-    if (process.env.VERBOSE_TESTS === 'true') {
+    if (process.env.VERBOSE_TESTS === "true") {
       originalConsoleError(...args);
     }
   };
@@ -27,7 +27,7 @@ beforeAll(() => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.warn = (...args: any[]) => {
     // Only show warning logs in test failures
-    if (process.env.VERBOSE_TESTS === 'true') {
+    if (process.env.VERBOSE_TESTS === "true") {
       originalConsoleWarn(...args);
     }
   };
@@ -53,12 +53,11 @@ afterEach(() => {
 });
 
 // Global error handler for unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
 
 // Global test utilities
-// eslint-disable-next-line @typescript-eslint/no-namespace
 declare global {
   namespace jest {
     interface Matchers<R> {
@@ -90,12 +89,14 @@ expect.extend({
     const pass = received >= floor && received <= ceiling;
     if (pass) {
       return {
-        message: () => `expected ${received} not to be within range ${floor} - ${ceiling}`,
+        message: () =>
+          `expected ${received} not to be within range ${floor} - ${ceiling}`,
         pass: true,
       };
     } else {
       return {
-        message: () => `expected ${received} to be within range ${floor} - ${ceiling}`,
+        message: () =>
+          `expected ${received} to be within range ${floor} - ${ceiling}`,
         pass: false,
       };
     }
