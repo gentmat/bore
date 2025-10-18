@@ -16,6 +16,7 @@ const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
 beforeAll(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.error = (...args: any[]) => {
     // Only show error logs in test failures
     if (process.env.VERBOSE_TESTS === 'true') {
@@ -23,6 +24,7 @@ beforeAll(() => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.warn = (...args: any[]) => {
     // Only show warning logs in test failures
     if (process.env.VERBOSE_TESTS === 'true') {
@@ -56,6 +58,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Global test utilities
+// eslint-disable-next-line @typescript-eslint/no-namespace
 declare global {
   namespace jest {
     interface Matchers<R> {
@@ -67,6 +70,7 @@ declare global {
 
 // Custom matchers
 expect.extend({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   toBeValidDate(received: any) {
     const pass = received instanceof Date && !isNaN(received.getTime());
     if (pass) {

@@ -158,6 +158,7 @@ function validate(schema: Joi.Schema, source: RequestSource = "body") {
     req[source] = normalized;
 
     // Also keep original for API compatibility
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (req as any)[`${source}Original`] = value;
 
     next();
