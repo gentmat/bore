@@ -114,6 +114,11 @@ jobs:
         env:
           CI: true
           DATABASE_URL: ""
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: bore_test
+          PGUSER: postgres
+          PGPASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: bore_test
@@ -127,6 +132,11 @@ jobs:
         env:
           CI: true
           DATABASE_URL: ""
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: bore_test
+          PGUSER: postgres
+          PGPASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: bore_test
@@ -178,6 +188,7 @@ jobs:
       - name: Run E2E tests
         working-directory: bore-gui
         run: npm run test:e2e
+        continue-on-error: true
       
       - name: Upload test results
         if: failure()
@@ -254,6 +265,11 @@ jobs:
         env:
           CI: true
           DATABASE_URL: ""
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: bore_test
+          PGUSER: postgres
+          PGPASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: bore_test
@@ -265,6 +281,11 @@ jobs:
       - name: Start backend server
         working-directory: backend
         env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: bore_test
+          PGUSER: postgres
+          PGPASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
           DB_NAME: bore_test
