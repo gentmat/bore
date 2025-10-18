@@ -1,19 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from './test/testUtils';
 import App from './App';
-import { mockInvoke } from './test/setup';
+import { mockInvoke, mockListen } from './test/setup';
 
 describe('App Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset to clean state without default implementation
+    mockInvoke.mockReset();
+    mockListen.mockReset();
+    // Mock listen to return a cleanup function
+    mockListen.mockResolvedValue(() => {});
   });
 
   describe('Initialization and Dependency Checking', () => {
-    it('should show loading state initially', () => {
-      mockInvoke.mockImplementation(() => new Promise(() => {})); // Never resolves
-      render(<App />);
+    it('should show loading state initially', async () => {
+      let resolveInvoke: (value: any) => void;
+      mockInvoke.mockImplementation(() => new Promise((resolve) => {
+        resolveInvoke = resolve;
+      }));
       
-      expect(screen.getByText('Preparing environment...')).toBeInTheDocument();
+      const { unmount } = render(<App />);
+      
+      // App shows "Checking bore-client and code-server..." after initial render
+      expect(screen.getByText('Checking bore-client and code-server...')).toBeInTheDocument();
+      
+      // Clean up by resolving the promise and unmounting
+      resolveInvoke!({
+        bore_installed: true,
+        bore_installed_now: false,
+        code_server_installed: true,
+        code_server_installed_now: false,
+      });
+      unmount();
     });
 
     it('should check dependencies on mount', async () => {
@@ -97,7 +116,8 @@ describe('App Component', () => {
           email: 'test@example.com',
         })
         .mockResolvedValueOnce([]) // list_instances
-        .mockResolvedValueOnce(undefined); // start_status_listener
+        .mockResolvedValueOnce(undefined) // start_status_listener
+        .mockResolvedValue(undefined); // catch-all for stop_status_listener and other calls
       
       render(<App />);
       
@@ -180,7 +200,8 @@ describe('App Component', () => {
       
       render(<App />);
       
-      expect(screen.getByText('Preparing environment...')).toBeInTheDocument();
+      // App shows "Checking bore-client and code-server..." after initial render
+      expect(screen.getByText('Checking bore-client and code-server...')).toBeInTheDocument();
       
       await waitFor(() => {
         expect(screen.getByText('Sign in to your account')).toBeInTheDocument();

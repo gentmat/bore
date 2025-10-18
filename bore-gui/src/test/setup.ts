@@ -1,10 +1,12 @@
-import { expect, afterEach, vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 // Cleanup after each test case
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Wait for any pending promises to resolve
+  await new Promise(resolve => setTimeout(resolve, 0));
 });
 
 // Mock Tauri API

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import Dashboard from './Dashboard';
 import { mockInvoke, mockListen } from '../test/setup';
 
-describe('Dashboard Component', () => {
+describe.sequential('Dashboard Component', () => {
   const mockCredentials = {
     user_id: 'test-user',
     token: 'test-token',
@@ -14,6 +14,8 @@ describe('Dashboard Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Ensure mocks always return Promises to prevent undefined errors
+    mockInvoke.mockResolvedValue(undefined);
     mockListen.mockResolvedValue(() => {});
   });
 

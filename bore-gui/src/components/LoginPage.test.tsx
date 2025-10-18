@@ -10,6 +10,8 @@ describe('LoginPage Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Ensure mockInvoke always returns a Promise to prevent undefined errors
+    mockInvoke.mockResolvedValue(undefined);
   });
 
   describe('Rendering', () => {

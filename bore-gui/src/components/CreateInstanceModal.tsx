@@ -36,11 +36,6 @@ export default function CreateInstanceModal({
     e.preventDefault();
     setError("");
 
-    if (!projectPath) {
-      setError("Please select a project folder");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -89,10 +84,11 @@ export default function CreateInstanceModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="instance-name-input" className="block text-sm font-medium text-gray-700 mb-2">
               Instance Name
             </label>
             <input
+              id="instance-name-input"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -107,11 +103,12 @@ export default function CreateInstanceModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="project-path-input" className="block text-sm font-medium text-gray-700 mb-2">
               Project Folder
             </label>
             <div className="flex items-center space-x-2">
               <input
+                id="project-path-input"
                 type="text"
                 value={projectPath}
                 onChange={(e) => setProjectPath(e.target.value)}

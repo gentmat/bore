@@ -43,7 +43,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
     });
     
     // Listen for real-time tunnel status changes (from both SSE and local events)
-    const unlisten = listen("tunnel-status-changed", () => {
+    const unlistenPromise = listen("tunnel-status-changed", () => {
       loadInstances();
     });
     
@@ -52,7 +52,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
     
     return () => {
       clearInterval(interval);
-      unlisten.then(f => f());
+      unlistenPromise?.then(f => f()).catch(() => {});
       invoke("stop_status_listener").catch(() => {});
     };
   }, []);
@@ -122,7 +122,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
   };
 
   const handleDeleteInstance = async (instanceId: string) => {
-    const instance = instances.find(i => i.id === instanceId);
+    const instance = instances?.find(i => i.id === instanceId);
     const isActive = instance?.status === "active";
     
     const message = isActive
@@ -152,7 +152,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
     }
   };
 
-  const activeTunnels = instances.filter((i) => i.status === "active").length;
+  const activeTunnels = instances?.filter((i) => i.status === "active").length ?? 0;
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-50">
@@ -228,7 +228,7 @@ export default function Dashboard({ credentials, onLogout }: DashboardProps) {
               <p className="mt-4 text-gray-600">Loading instances...</p>
             </div>
           </div>
-        ) : instances.length === 0 ? (
+        ) : !instances || instances.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-4">
