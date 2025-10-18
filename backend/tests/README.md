@@ -1,6 +1,6 @@
 # Backend Tests
 
-Comprehensive unit and integration tests for the Bore backend API.
+Unit tests for the Bore backend API core functionality.
 
 ## Running Tests
 
@@ -24,21 +24,30 @@ npm run test:watch
 npm test -- --coverage
 ```
 
+### Run Only Unit Tests
+```bash
+npm run test:unit
+```
+
 ## Test Structure
 
 ```
 tests/
-├── auth.test.js           # Authentication endpoints
-├── error-handler.test.js  # Error handling utilities
-├── validation.test.js     # Input validation
-└── README.md             # This file
+├── capacity-limiter.test.ts    # Capacity limiting functionality
+├── circuit-breaker.test.ts     # Circuit breaker pattern
+├── error-handler.test.ts       # Error handling utilities
+├── naming-convention.test.ts   # Field naming conventions
+├── server-registry.test.ts     # Server registry management
+├── validation.test.ts          # Input validation
+├── jest.setup.ts              # Global test configuration
+└── README.md                  # This file
 ```
 
 ## Test Coverage Goals
 
-- **Routes**: 80%+ coverage
-- **Utilities**: 90%+ coverage
+- **Core Utilities**: 80%+ coverage
 - **Middleware**: 85%+ coverage
+- **Services**: 70%+ coverage
 
 ## Writing New Tests
 
@@ -96,10 +105,12 @@ jest.mock('../database', () => ({
 
 ## Continuous Integration
 
-Tests run automatically on:
+Unit tests run automatically on:
 - Every push to `main` branch
 - Every pull request
 - Pre-deployment checks
+
+Note: Integration and E2E tests have been removed as they required external dependencies (database, running servers).
 
 ## Coverage Reports
 
@@ -119,6 +130,6 @@ open coverage/lcov-report/index.html
 - Increase timeout for slow tests: `jest.setTimeout(10000)`
 - Check for unhandled promises
 
-### Database connection errors
-- Ensure database mocks are properly configured
-- Don't use real database in tests
+### Mock configuration
+- All external dependencies are mocked (database, Redis, etc.)
+- Tests run in isolation without requiring external services
