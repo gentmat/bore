@@ -4,8 +4,8 @@
  * and use full capacity-limiter.js
  */
 
-import { Request, Response, NextFunction } from 'express';
-import { createLogger } from '../utils/logger';
+import { Request, Response, NextFunction } from "express";
+import { createLogger } from "../utils/logger";
 
 interface CapacityConfig {
   maxTunnelsByPlan: {
@@ -36,64 +36,71 @@ const CAPACITY_CONFIG: CapacityConfig = {
   maxTunnelsByPlan: {
     trial: 1,
     pro: 5,
-    enterprise: 20
+    enterprise: 20,
   },
   totalSystemCapacity: 100,
-  reservedCapacityPercent: 20
+  reservedCapacityPercent: 20,
 };
 
-const logger = createLogger('capacity-check');
+const logger = createLogger("capacity-check");
 
 /**
  * Check if user can create more tunnels (in-memory version)
  */
-function checkUserQuota(req: Request, res: Response, next: NextFunction): Response | void {
+function checkUserQuota(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Response | void {
   try {
     const userId = req.user?.user_id;
     if (!userId) {
       return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
+        error: "unauthorized",
+        message: "Authentication required",
       });
     }
-    
+
     // Get user from in-memory store (passed via req.app.locals)
     const locals = req.app.locals as AppLocals;
     const users = locals.users || [];
     const instances = locals.instances || [];
-    
-    const user = users.find(u => u.id === userId);
+
+    const user = users.find((u) => u.id === userId);
     if (!user) {
-      return res.status(404).json({ 
-        error: 'user_not_found', 
-        message: 'User not found' 
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "User not found",
       });
     }
-    
-    const plan = user.plan || 'trial';
-    const maxTunnels = CAPACITY_CONFIG.maxTunnelsByPlan[plan as keyof typeof CAPACITY_CONFIG.maxTunnelsByPlan] || 1;
-    
+
+    const plan = user.plan || "trial";
+    const maxTunnels =
+      CAPACITY_CONFIG.maxTunnelsByPlan[
+        plan as keyof typeof CAPACITY_CONFIG.maxTunnelsByPlan
+      ] || 1;
+
     // Count user's active tunnels
     const activeTunnels = instances.filter(
-      i => i.user_id === userId && i.tunnel_connected
+      (i) => i.user_id === userId && i.tunnel_connected,
     ).length;
-    
+
     if (activeTunnels >= maxTunnels) {
       return res.status(429).json({
-        error: 'quota_exceeded',
+        error: "quota_exceeded",
         message: `Plan limit reached (${maxTunnels} tunnels). Upgrade your plan to create more tunnels.`,
         details: {
           activeTunnels,
           maxTunnels,
-          plan
+          plan,
         },
-        upgrade_url: '/claim-plan'
+        upgrade_url: "/claim-plan",
       });
     }
-    
+
     next();
   } catch (error) {
-    logger.error('Capacity check error', error);
+    logger.error("Capacity check error", error as Error);
     // Fail open - allow request if check fails
     next();
   }
@@ -102,37 +109,42 @@ function checkUserQuota(req: Request, res: Response, next: NextFunction): Respon
 /**
  * Check system capacity
  */
-function checkSystemCapacity(req: Request, res: Response, next: NextFunction): Response | void {
+function checkSystemCapacity(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Response | void {
   try {
     const locals = req.app.locals as AppLocals;
     const instances = locals.instances || [];
-    
-    const activeTunnels = instances.filter(i => i.tunnel_connected).length;
+
+    const activeTunnels = instances.filter((i) => i.tunnel_connected).length;
     const reservedSlots = Math.floor(
-      CAPACITY_CONFIG.totalSystemCapacity * CAPACITY_CONFIG.reservedCapacityPercent / 100
+      (CAPACITY_CONFIG.totalSystemCapacity *
+        CAPACITY_CONFIG.reservedCapacityPercent) /
+        100,
     );
-    
-    if (activeTunnels >= (CAPACITY_CONFIG.totalSystemCapacity - reservedSlots)) {
+
+    if (activeTunnels >= CAPACITY_CONFIG.totalSystemCapacity - reservedSlots) {
       return res.status(503).json({
-        error: 'capacity_exceeded',
-        message: 'System at capacity. Please try again later.',
+        error: "capacity_exceeded",
+        message: "System at capacity. Please try again later.",
         details: {
-          utilizationPercent: ((activeTunnels / CAPACITY_CONFIG.totalSystemCapacity) * 100).toFixed(1),
+          utilizationPercent: (
+            (activeTunnels / CAPACITY_CONFIG.totalSystemCapacity) *
+            100
+          ).toFixed(1),
           activeTunnels,
-          totalCapacity: CAPACITY_CONFIG.totalSystemCapacity
-        }
+          totalCapacity: CAPACITY_CONFIG.totalSystemCapacity,
+        },
       });
     }
-    
+
     next();
   } catch (error) {
-    logger.error('System capacity check error', error);
+    logger.error("System capacity check error", error as Error);
     next();
   }
 }
 
-export {
-  checkUserQuota,
-  checkSystemCapacity,
-  CAPACITY_CONFIG
-};
+export { checkUserQuota, checkSystemCapacity, CAPACITY_CONFIG };

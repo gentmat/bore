@@ -3,20 +3,23 @@
  * Provides request tracing across microservices
  */
 
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { registerInstrumentations } from '@opentelemetry/instrumentation';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
-import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
-import { RedisInstrumentation } from '@opentelemetry/instrumentation-redis-4';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { BatchSpanProcessor, ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base';
-import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
-import { Span, trace, context } from '@opentelemetry/api';
-import { Request, Response, NextFunction } from 'express';
-import config from './config';
-import { logger } from './utils/logger';
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
+import { PgInstrumentation } from "@opentelemetry/instrumentation-pg";
+import { RedisInstrumentation } from "@opentelemetry/instrumentation-redis-4";
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import {
+  BatchSpanProcessor,
+  ConsoleSpanExporter,
+} from "@opentelemetry/sdk-trace-base";
+import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { Span, trace, context } from "@opentelemetry/api";
+import { Request, Response, NextFunction } from "express";
+import config from "./config";
+import { logger } from "./utils/logger";
 
 interface RequestWithTrace extends Request {
   traceId?: string;
@@ -28,36 +31,42 @@ interface RequestWithTrace extends Request {
  * @param {string} serviceName - Name of the service
  * @returns {NodeTracerProvider} Tracer provider instance
  */
-function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProvider | null {
+function initializeTracing(
+  serviceName: string = "bore-backend",
+): NodeTracerProvider | null {
   try {
     // Skip if disabled
-    if (process.env.TRACING_ENABLED !== 'true') {
-      logger.info('🔍 Distributed tracing disabled');
+    if (process.env.TRACING_ENABLED !== "true") {
+      logger.info("🔍 Distributed tracing disabled");
       return null;
     }
 
     const provider = new NodeTracerProvider({
       resource: new Resource({
         [SemanticResourceAttributes.SERVICE_NAME]: serviceName,
-        [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
-        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.server.nodeEnv,
+        [SemanticResourceAttributes.SERVICE_VERSION]: "1.0.0",
+        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]:
+          config.server.nodeEnv,
       }),
     });
 
     // Configure exporter
     let exporter;
-    const exporterType = process.env.TRACE_EXPORTER || 'console';
+    const exporterType = process.env.TRACE_EXPORTER || "console";
 
-    if (exporterType === 'jaeger') {
+    if (exporterType === "jaeger") {
       // Jaeger exporter for production
       exporter = new JaegerExporter({
-        endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+        endpoint:
+          process.env.JAEGER_ENDPOINT || "http://localhost:14268/api/traces",
       });
-      logger.info(`🔍 Tracing to Jaeger: ${process.env.JAEGER_ENDPOINT || 'http://localhost:14268'}`);
+      logger.info(
+        `🔍 Tracing to Jaeger: ${process.env.JAEGER_ENDPOINT || "http://localhost:14268"}`,
+      );
     } else {
       // Console exporter for development
       exporter = new ConsoleSpanExporter();
-      logger.info('🔍 Tracing to console (development mode)');
+      logger.info("🔍 Tracing to console (development mode)");
     }
 
     provider.addSpanProcessor(new BatchSpanProcessor(exporter));
@@ -70,13 +79,23 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
       instrumentations: [
         // HTTP instrumentation for all HTTP requests
         new HttpInstrumentation({
-          requestHook: (span, request: { headers: Record<string, string> }) => {
-            span.setAttribute('http.request_id', request.headers['x-request-id']);
+          requestHook: (span, request) => {
+            // Type guard to check if request has headers
+            if ("headers" in request && request.headers) {
+              const headers = request.headers as Record<string, string>;
+              const requestId = headers["x-request-id"];
+              if (requestId) {
+                span.setAttribute("http.request_id", requestId);
+              }
+            }
           },
         }),
         // Express instrumentation for route tracing
         new ExpressInstrumentation({
-          requestHook: (span, info: { request: { method: string }; layerType: string }) => {
+          requestHook: (
+            span,
+            info: { request: { method: string }; layerType: string },
+          ) => {
             span.updateName(`${info.request.method} ${info.layerType}`);
           },
         }),
@@ -89,13 +108,18 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
       ],
     });
 
-    logger.info('✅ Distributed tracing initialized');
+    logger.info("✅ Distributed tracing initialized");
     return provider;
   } catch (error) {
-    logger.warn('⚠️  Failed to initialize tracing (optional dependencies may be missing)', {
-      error: (error as Error).message
-    });
-    logger.info('💡 To enable tracing, install: npm install @opentelemetry/api @opentelemetry/sdk-trace-node @opentelemetry/instrumentation @opentelemetry/instrumentation-http @opentelemetry/instrumentation-express @opentelemetry/instrumentation-pg @opentelemetry/instrumentation-redis-4 @opentelemetry/exporter-jaeger');
+    logger.warn(
+      "⚠️  Failed to initialize tracing (optional dependencies may be missing)",
+      {
+        error: (error as Error).message,
+      },
+    );
+    logger.info(
+      "💡 To enable tracing, install: npm install @opentelemetry/api @opentelemetry/sdk-trace-node @opentelemetry/instrumentation @opentelemetry/instrumentation-http @opentelemetry/instrumentation-express @opentelemetry/instrumentation-pg @opentelemetry/instrumentation-redis-4 @opentelemetry/exporter-jaeger",
+    );
     return null;
   }
 }
@@ -107,18 +131,25 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
  * @param {Object} attributes - Custom attributes
  */
 async function traceFunction<T>(
-  name: string, 
-  fn: (span?: Span) => Promise<T>, 
-  attributes: Record<string, unknown> = {}
+  name: string,
+  fn: (span?: Span) => Promise<T>,
+  attributes: Record<string, unknown> = {},
 ): Promise<T> {
   try {
-    const tracer = trace.getTracer('bore-backend');
-    
+    const tracer = trace.getTracer("bore-backend");
+
     return await tracer.startActiveSpan(name, async (span) => {
       try {
         // Add custom attributes
         Object.entries(attributes).forEach(([key, value]) => {
-          span.setAttribute(key, value);
+          // Only add if value is a supported attribute type
+          if (
+            typeof value === "string" ||
+            typeof value === "number" ||
+            typeof value === "boolean"
+          ) {
+            span.setAttribute(key, value);
+          }
         });
 
         const result = await fn(span);
@@ -141,10 +172,14 @@ async function traceFunction<T>(
 /**
  * Middleware to add trace context to logs
  */
-function traceContextMiddleware(req: RequestWithTrace, _res: Response, next: NextFunction): void {
+function traceContextMiddleware(
+  req: RequestWithTrace,
+  _res: Response,
+  next: NextFunction,
+): void {
   try {
     const span = trace.getSpan(context.active());
-    
+
     if (span) {
       const spanContext = span.spanContext();
       req.traceId = spanContext.traceId;
@@ -159,13 +194,15 @@ function traceContextMiddleware(req: RequestWithTrace, _res: Response, next: Nex
 /**
  * Gracefully shutdown tracing
  */
-async function shutdownTracing(provider: NodeTracerProvider | null): Promise<void> {
+async function shutdownTracing(
+  provider: NodeTracerProvider | null,
+): Promise<void> {
   if (provider) {
     try {
       await provider.shutdown();
-      logger.info('✅ Tracing shutdown complete');
+      logger.info("✅ Tracing shutdown complete");
     } catch (error) {
-      logger.error('Failed to shutdown tracing', error as Error);
+      logger.error("Failed to shutdown tracing", error as Error);
     }
   }
 }
@@ -174,5 +211,5 @@ export {
   initializeTracing,
   shutdownTracing,
   traceFunction as trace,
-  traceContextMiddleware
+  traceContextMiddleware,
 };

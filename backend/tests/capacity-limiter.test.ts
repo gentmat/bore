@@ -7,32 +7,43 @@ import {
   checkSystemCapacity,
   checkUserQuota,
   requireCapacity,
-  getCapacityStats
-} from '../capacity-limiter';
-import { db } from '../database';
-import { getFleetStats } from '../server-registry';
-import { Request, Response, NextFunction } from 'express';
+  getCapacityStats,
+} from "../capacity-limiter";
+import { db } from "../database";
+import { getFleetStats } from "../server-registry";
+import { Request, Response, NextFunction } from "express";
+import { CapacityInfo } from "../capacity-limiter";
 
 // Mock dependencies
-jest.mock('../database');
-jest.mock('../server-registry');
-jest.mock('../utils/logger');
+jest.mock("../database");
+jest.mock("../server-registry");
+jest.mock("../utils/logger");
 
-const mockDb = db as jest.Mocked<typeof db>;
-const mockGetFleetStats = getFleetStats as jest.MockedFunction<typeof getFleetStats>;
+const mockDb = {
+  query: jest.fn(),
+  getUserById: jest.fn(),
+  getInstanceById: jest.fn(),
+  updateInstance: jest.fn(),
+  addStatusHistory: jest.fn(),
+  deleteTunnelToken: jest.fn(),
+} as jest.Mocked<typeof db>;
+
+const mockGetFleetStats = getFleetStats as jest.MockedFunction<
+  typeof getFleetStats
+>;
 
 interface RequestWithUser extends Request {
   user?: { user_id: string; email: string; plan: string };
-  capacityInfo?: unknown;
+  capacityInfo?: CapacityInfo;
 }
 
-describe('Capacity Limiter', () => {
+describe("Capacity Limiter", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('checkSystemCapacity', () => {
-    it('should return capacity available when under limit', async () => {
+  describe("checkSystemCapacity", () => {
+    it("should return capacity available when under limit", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -41,7 +52,7 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 3,
         bandwidthUtilizationPercent: 30,
-        servers: []
+        servers: [],
       });
 
       const result = await checkSystemCapacity();
@@ -52,7 +63,7 @@ describe('Capacity Limiter', () => {
       expect(result.utilizationPercent).toBe(50);
     });
 
-    it('should return no capacity when at limit', async () => {
+    it("should return no capacity when at limit", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -61,7 +72,7 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 8,
         bandwidthUtilizationPercent: 80,
-        servers: []
+        servers: [],
       });
 
       const result = await checkSystemCapacity();
@@ -70,7 +81,7 @@ describe('Capacity Limiter', () => {
       expect(result.activeTunnels).toBe(85);
     });
 
-    it('should handle no servers available', async () => {
+    it("should handle no servers available", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 0,
         totalCapacity: 0,
@@ -79,11 +90,11 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 0,
         usedBandwidthGbps: 0,
         bandwidthUtilizationPercent: 0,
-        servers: []
+        servers: [],
       });
 
       (mockDb.query as jest.Mock).mockResolvedValue({
-        rows: [{ active: '10' }]
+        rows: [{ active: "10" }],
       });
 
       const result = await checkSystemCapacity();
@@ -92,8 +103,8 @@ describe('Capacity Limiter', () => {
       expect(result.serverCount).toBe(0);
     });
 
-    it('should handle errors gracefully', async () => {
-      mockGetFleetStats.mockRejectedValue(new Error('Redis connection failed'));
+    it("should handle errors gracefully", async () => {
+      mockGetFleetStats.mockRejectedValue(new Error("Redis connection failed"));
 
       const result = await checkSystemCapacity();
 
@@ -102,95 +113,97 @@ describe('Capacity Limiter', () => {
     });
   });
 
-  describe('checkUserQuota', () => {
-    it('should allow user under quota', async () => {
+  describe("checkUserQuota", () => {
+    it("should allow user under quota", async () => {
       (mockDb.getUserById as jest.Mock).mockResolvedValue({
-        id: 'user_123',
-        plan: 'pro'
+        id: "user_123",
+        plan: "pro",
       });
 
       (mockDb.query as jest.Mock).mockResolvedValue({
-        rows: [{ count: '2' }]
+        rows: [{ count: "2" }],
       });
 
-      const result = await checkUserQuota('user_123');
+      const result = await checkUserQuota("user_123");
 
       expect(result.allowed).toBe(true);
       expect(result.activeTunnels).toBe(2);
       expect(result.maxTunnels).toBe(5); // Pro plan limit
     });
 
-    it('should reject user at quota', async () => {
+    it("should reject user at quota", async () => {
       (mockDb.getUserById as jest.Mock).mockResolvedValue({
-        id: 'user_123',
-        plan: 'trial'
+        id: "user_123",
+        plan: "trial",
       });
 
       (mockDb.query as jest.Mock).mockResolvedValue({
-        rows: [{ count: '1' }]
+        rows: [{ count: "1" }],
       });
 
-      const result = await checkUserQuota('user_123');
+      const result = await checkUserQuota("user_123");
 
       expect(result.allowed).toBe(false);
       expect(result.activeTunnels).toBe(1);
       expect(result.maxTunnels).toBe(1); // Trial plan limit
-      expect(result.reason).toContain('Plan limit reached');
+      expect(result.reason).toContain("Plan limit reached");
     });
 
-    it('should handle enterprise plan', async () => {
+    it("should handle enterprise plan", async () => {
       (mockDb.getUserById as jest.Mock).mockResolvedValue({
-        id: 'user_123',
-        plan: 'enterprise'
+        id: "user_123",
+        plan: "enterprise",
       });
 
       (mockDb.query as jest.Mock).mockResolvedValue({
-        rows: [{ count: '15' }]
+        rows: [{ count: "15" }],
       });
 
-      const result = await checkUserQuota('user_123');
+      const result = await checkUserQuota("user_123");
 
       expect(result.allowed).toBe(true);
       expect(result.maxTunnels).toBe(20); // Enterprise plan limit
     });
 
-    it('should handle user not found', async () => {
+    it("should handle user not found", async () => {
       (mockDb.getUserById as jest.Mock).mockResolvedValue(null);
 
-      const result = await checkUserQuota('user_nonexistent');
+      const result = await checkUserQuota("user_nonexistent");
 
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('User not found');
+      expect(result.reason).toContain("User not found");
     });
 
-    it('should handle database errors', async () => {
-      (mockDb.getUserById as jest.Mock).mockRejectedValue(new Error('Database connection lost'));
+    it("should handle database errors", async () => {
+      (mockDb.getUserById as jest.Mock).mockRejectedValue(
+        new Error("Database connection lost"),
+      );
 
-      const result = await checkUserQuota('user_123');
+      const result = await checkUserQuota("user_123");
 
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Failed to check quota');
+      expect(result.reason).toContain("Failed to check quota");
     });
   });
 
-  describe('requireCapacity middleware', () => {
+  describe("requireCapacity middleware", () => {
     let req: Partial<RequestWithUser>;
     let res: Partial<Response>;
     let next: NextFunction;
 
     beforeEach(() => {
       req = {
-        user: { user_id: 'user_123', email: 'test@example.com', plan: 'trial' },
-        id: 'req_123'
+        user: { user_id: "user_123", email: "test@example.com", plan: "trial" },
+        id: "req_123",
       };
       res = {
         status: jest.fn().mockReturnThis(),
-        json: jest.fn()
+        json: jest.fn(),
       } as Partial<Response>;
       next = jest.fn();
     });
 
-    it('should allow request when capacity available', async () => {
+    it("should allow request when capacity available", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -199,11 +212,11 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 3,
         bandwidthUtilizationPercent: 30,
-        servers: []
+        servers: [],
       });
 
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: 'pro' });
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: '1' }] });
+      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: "pro" });
+      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: "1" }] });
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 
@@ -211,7 +224,7 @@ describe('Capacity Limiter', () => {
       expect(req.capacityInfo).toBeDefined();
     });
 
-    it('should reject when system at capacity', async () => {
+    it("should reject when system at capacity", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -220,7 +233,7 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 8,
         bandwidthUtilizationPercent: 80,
-        servers: []
+        servers: [],
       });
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
@@ -228,13 +241,13 @@ describe('Capacity Limiter', () => {
       expect(res.status).toHaveBeenCalledWith(503);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'capacity_exceeded'
-        })
+          error: "capacity_exceeded",
+        }),
       );
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should reject when user at quota', async () => {
+    it("should reject when user at quota", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -243,25 +256,25 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 3,
         bandwidthUtilizationPercent: 30,
-        servers: []
+        servers: [],
       });
 
-      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: 'trial' });
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: '1' }] });
+      (mockDb.getUserById as jest.Mock).mockResolvedValue({ plan: "trial" });
+      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ count: "1" }] });
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 
       expect(res.status).toHaveBeenCalledWith(429);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'quota_exceeded'
-        })
+          error: "quota_exceeded",
+        }),
       );
     });
   });
 
-  describe('getCapacityStats', () => {
-    it('should return comprehensive capacity statistics', async () => {
+  describe("getCapacityStats", () => {
+    it("should return comprehensive capacity statistics", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 3,
         totalCapacity: 300,
@@ -270,10 +283,12 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 30,
         usedBandwidthGbps: 13.5,
         bandwidthUtilizationPercent: 45,
-        servers: []
+        servers: [],
       });
 
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ active: '150' }] });
+      (mockDb.query as jest.Mock).mockResolvedValue({
+        rows: [{ active: "150" }],
+      });
 
       const stats = await getCapacityStats();
 
@@ -281,7 +296,7 @@ describe('Capacity Limiter', () => {
       expect(stats.system.utilizationPercent).toBe(50);
     });
 
-    it('should generate capacity alerts', async () => {
+    it("should generate capacity alerts", async () => {
       mockGetFleetStats.mockResolvedValue({
         serverCount: 2,
         totalCapacity: 100,
@@ -290,10 +305,12 @@ describe('Capacity Limiter', () => {
         totalBandwidthGbps: 10,
         usedBandwidthGbps: 8.8,
         bandwidthUtilizationPercent: 88,
-        servers: []
+        servers: [],
       });
 
-      (mockDb.query as jest.Mock).mockResolvedValue({ rows: [{ active: '92' }] });
+      (mockDb.query as jest.Mock).mockResolvedValue({
+        rows: [{ active: "92" }],
+      });
 
       const stats = await getCapacityStats();
 

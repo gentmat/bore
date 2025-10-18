@@ -84,17 +84,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "yamljs": "^0.3.0"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "coverageDirectory": "./coverage",
-    "collectCoverageFrom": [
-      "**/*.ts",
-      "!node_modules/**",
-      "!coverage/**",
-      "!dist/**",
-      "!**/*.d.ts"
-    ]
   }
 }

@@ -4,11 +4,17 @@
  * Enables horizontal scaling by moving in-memory state to Redis
  */
 
-import config from '../config';
-import { logger } from '../utils/logger';
+import config from "../config";
+import { logger } from "../utils/logger";
 
 let redis: {
-  createClient: (options: { socket: { host: string; port: number; reconnectStrategy: (retries: number) => number | Error } }) => {
+  createClient: (options: {
+    socket: {
+      host: string;
+      port: number;
+      reconnectStrategy: (retries: number) => number | Error;
+    };
+  }) => {
     on: (event: string, callback: (err?: Error) => void) => void;
     connect: () => Promise<void>;
     quit: () => Promise<void>;
@@ -16,9 +22,9 @@ let redis: {
 } | null;
 
 try {
-  redis = require('redis');
+  redis = require("redis");
 } catch (error) {
-  logger.warn('Redis package not available, Redis features will be disabled');
+  logger.warn("Redis package not available, Redis features will be disabled");
   redis = null;
 }
 
@@ -28,7 +34,10 @@ type RedisClient = {
   del: (key: string) => Promise<number>;
   exists: (key: string) => Promise<number>;
   ping: () => Promise<string>;
-  scan: (cursor: number, options: { MATCH: string; COUNT: number }) => Promise<{ cursor: number; keys: string[] }>;
+  scan: (
+    cursor: number,
+    options: { MATCH: string; COUNT: number },
+  ) => Promise<{ cursor: number; keys: string[] }>;
   on: (event: string, callback: (err?: Error) => void) => void;
   connect: () => Promise<void>;
   quit: () => Promise<void>;
@@ -48,13 +57,17 @@ export async function initializeRedis(): Promise<RedisClient | null> {
 
   // If Redis is disabled, return null (fall back to in-memory)
   if (!config.redis.enabled) {
-    logger.warn('Redis is disabled - using in-memory state (not suitable for production scaling)');
+    logger.warn(
+      "Redis is disabled - using in-memory state (not suitable for production scaling)",
+    );
     return null;
   }
 
   // Check if redis package is available
   if (!redis || !redis.createClient) {
-    logger.error('Redis package is not available - cannot initialize Redis connection');
+    logger.error(
+      "Redis package is not available - cannot initialize Redis connection",
+    );
     return null;
   }
 
@@ -65,40 +78,42 @@ export async function initializeRedis(): Promise<RedisClient | null> {
         port: config.redis.port,
         reconnectStrategy: (retries: number) => {
           if (retries > 10) {
-            logger.error('Redis reconnect failed after 10 attempts');
-            return new Error('Max reconnection attempts reached');
+            logger.error("Redis reconnect failed after 10 attempts");
+            return new Error("Max reconnection attempts reached");
           }
           // Exponential backoff: 50ms, 100ms, 200ms, 400ms, etc.
           return Math.min(retries * 50, 3000);
-        }
-      }
+        },
+      },
     }) as RedisClient;
 
-    redisClient.on('error', (err: Error) => {
-      logger.error('Redis client error', err);
+    redisClient.on("error", (err?: Error) => {
+      if (err) {
+        logger.error("Redis client error", err);
+      }
       isConnected = false;
     });
 
-    redisClient.on('connect', () => {
-      logger.info('Redis client connecting...');
+    redisClient.on("connect", () => {
+      logger.info("Redis client connecting...");
     });
 
-    redisClient.on('ready', () => {
-      logger.info('✅ Redis client ready');
+    redisClient.on("ready", () => {
+      logger.info("✅ Redis client ready");
       isConnected = true;
     });
 
-    redisClient.on('reconnecting', () => {
-      logger.warn('Redis client reconnecting...');
+    redisClient.on("reconnecting", () => {
+      logger.warn("Redis client reconnecting...");
       isConnected = false;
     });
 
     await redisClient.connect();
-    logger.info('🔗 Redis initialized successfully');
-    
+    logger.info("🔗 Redis initialized successfully");
+
     return redisClient;
   } catch (error) {
-    logger.error('Failed to initialize Redis', error as Error);
+    logger.error("Failed to initialize Redis", error as Error);
     throw error;
   }
 }
@@ -119,21 +134,21 @@ export function getClient(): RedisClient | null {
 async function scanKeys(pattern: string): Promise<string[]> {
   const client = getClient();
   if (!client) return [];
-  
+
   try {
     const keys: string[] = [];
     let cursor = 0;
-    
+
     do {
       const result = await client.scan(cursor, {
         MATCH: pattern,
-        COUNT: 100
+        COUNT: 100,
       });
-      
+
       cursor = result.cursor;
       keys.push(...result.keys);
     } while (cursor !== 0);
-    
+
     return keys;
   } catch (error) {
     logger.error(`Failed to scan keys with pattern ${pattern}`, error as Error);
@@ -151,10 +166,14 @@ export const heartbeats = {
    * @param timestamp - Timestamp in milliseconds
    * @param ttl - Time to live in seconds (default: 60)
    */
-  async set(instanceId: string, timestamp: number, ttl: number = 60): Promise<void> {
+  async set(
+    instanceId: string,
+    timestamp: number,
+    ttl: number = 60,
+  ): Promise<void> {
     const client = getClient();
     if (!client) return; // Fall back to in-memory if Redis unavailable
-    
+
     try {
       const key = `heartbeat:${instanceId}`;
       await client.setEx(key, ttl, timestamp.toString());
@@ -171,7 +190,7 @@ export const heartbeats = {
   async get(instanceId: string): Promise<number | null> {
     const client = getClient();
     if (!client) return null;
-    
+
     try {
       const key = `heartbeat:${instanceId}`;
       const value = await client.get(key);
@@ -189,12 +208,15 @@ export const heartbeats = {
   async delete(instanceId: string): Promise<void> {
     const client = getClient();
     if (!client) return;
-    
+
     try {
       const key = `heartbeat:${instanceId}`;
       await client.del(key);
     } catch (error) {
-      logger.error(`Failed to delete heartbeat for ${instanceId}`, error as Error);
+      logger.error(
+        `Failed to delete heartbeat for ${instanceId}`,
+        error as Error,
+      );
     }
   },
 
@@ -205,25 +227,25 @@ export const heartbeats = {
   async getAll(): Promise<Map<string, number>> {
     const client = getClient();
     if (!client) return new Map();
-    
+
     try {
-      const keys = await scanKeys('heartbeat:*');
+      const keys = await scanKeys("heartbeat:*");
       const heartbeatMap = new Map<string, number>();
-      
+
       for (const key of keys) {
-        const instanceId = key.replace('heartbeat:', '');
+        const instanceId = key.replace("heartbeat:", "");
         const value = await client.get(key);
         if (value) {
           heartbeatMap.set(instanceId, parseInt(value, 10));
         }
       }
-      
+
       return heartbeatMap;
     } catch (error) {
-      logger.error('Failed to get all heartbeats', error as Error);
+      logger.error("Failed to get all heartbeats", error as Error);
       return new Map();
     }
-  }
+  },
 };
 
 /**
@@ -245,7 +267,7 @@ export const servers = {
   async set(serverId: string, serverData: ServerData): Promise<void> {
     const client = getClient();
     if (!client) return;
-    
+
     try {
       const key = `server:${serverId}`;
       await client.setEx(key, 300, JSON.stringify(serverData)); // 5 minute TTL
@@ -262,7 +284,7 @@ export const servers = {
   async get(serverId: string): Promise<ServerData | null> {
     const client = getClient();
     if (!client) return null;
-    
+
     try {
       const key = `server:${serverId}`;
       const value = await client.get(key);
@@ -280,22 +302,22 @@ export const servers = {
   async getAll(): Promise<Map<string, ServerData>> {
     const client = getClient();
     if (!client) return new Map();
-    
+
     try {
-      const keys = await scanKeys('server:*');
+      const keys = await scanKeys("server:*");
       const serverMap = new Map<string, ServerData>();
-      
+
       for (const key of keys) {
-        const serverId = key.replace('server:', '');
+        const serverId = key.replace("server:", "");
         const value = await client.get(key);
         if (value) {
           serverMap.set(serverId, JSON.parse(value));
         }
       }
-      
+
       return serverMap;
     } catch (error) {
-      logger.error('Failed to get all servers', error as Error);
+      logger.error("Failed to get all servers", error as Error);
       return new Map();
     }
   },
@@ -307,14 +329,14 @@ export const servers = {
   async delete(serverId: string): Promise<void> {
     const client = getClient();
     if (!client) return;
-    
+
     try {
       const key = `server:${serverId}`;
       await client.del(key);
     } catch (error) {
       logger.error(`Failed to delete server ${serverId}`, error as Error);
     }
-  }
+  },
 };
 
 /**
@@ -329,12 +351,12 @@ export const tokenBlacklist = {
   async add(token: string, expiresIn: number): Promise<void> {
     const client = getClient();
     if (!client) return;
-    
+
     try {
       const key = `blacklist:${token}`;
-      await client.setEx(key, expiresIn, '1');
+      await client.setEx(key, expiresIn, "1");
     } catch (error) {
-      logger.error('Failed to blacklist token', error as Error);
+      logger.error("Failed to blacklist token", error as Error);
     }
   },
 
@@ -346,16 +368,16 @@ export const tokenBlacklist = {
   async isBlacklisted(token: string): Promise<boolean> {
     const client = getClient();
     if (!client) return false;
-    
+
     try {
       const key = `blacklist:${token}`;
       const exists = await client.exists(key);
       return exists === 1;
     } catch (error) {
-      logger.error('Failed to check token blacklist', error as Error);
+      logger.error("Failed to check token blacklist", error as Error);
       return false;
     }
-  }
+  },
 };
 
 /**
@@ -371,9 +393,9 @@ export async function healthCheck(): Promise<boolean> {
   try {
     // Simple PING command to verify connectivity
     const response = await client.ping();
-    return response === 'PONG';
+    return response === "PONG";
   } catch (error) {
-    logger.error('Redis health check failed', error as Error);
+    logger.error("Redis health check failed", error as Error);
     return false;
   }
 }
@@ -383,10 +405,10 @@ export async function healthCheck(): Promise<boolean> {
  */
 export async function shutdown(): Promise<void> {
   if (redisClient && isConnected) {
-    logger.info('Closing Redis connection...');
+    logger.info("Closing Redis connection...");
     await redisClient.quit();
     isConnected = false;
-    logger.info('Redis connection closed');
+    logger.info("Redis connection closed");
   }
 }
 
@@ -403,5 +425,5 @@ export default {
   tokenBlacklist,
   healthCheck,
   shutdown,
-  scanKeys
+  scanKeys,
 };
