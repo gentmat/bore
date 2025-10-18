@@ -117,6 +117,13 @@ interface LoggingConfig {
   level: string;
 }
 
+interface AdminConfig {
+  email: string | null;
+  password: string | null;
+  name: string | null;
+  autoCreate: boolean;
+}
+
 interface Config {
   server: ServerConfig;
   security: SecurityConfig;
@@ -132,6 +139,7 @@ interface Config {
   capacity: CapacityConfig;
   alerting: AlertingConfig;
   logging: LoggingConfig;
+  admin: AdminConfig;
 }
 
 const config: Config = {
@@ -271,6 +279,14 @@ const config: Config = {
   logging: {
     level: process.env.LOG_LEVEL || ((process.env.NODE_ENV || 'development') === 'production' ? 'info' : 'debug'),
   },
+
+  // Admin Configuration
+  admin: {
+    email: process.env.ADMIN_EMAIL || null,
+    password: process.env.ADMIN_PASSWORD || null,
+    name: process.env.ADMIN_NAME || null,
+    autoCreate: process.env.ADMIN_AUTO_CREATE === 'true',
+  },
 };
 
 // Validation: Fail-fast for critical missing configs in production
@@ -306,5 +322,6 @@ export {
   PlansConfig,
   CapacityConfig,
   AlertingConfig,
-  LoggingConfig
+  LoggingConfig,
+  AdminConfig
 };

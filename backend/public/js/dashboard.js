@@ -26,7 +26,7 @@
       container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     }
     try {
-      const response = await fetch(`${API_BASE}/api/user/instances`, {
+      const response = await fetch(`${API_BASE}/api/v1/instances`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -185,7 +185,7 @@
   }
   async function connectInstance(instanceId) {
     try {
-      const response = await fetch(`${API_BASE}/api/user/instances/${instanceId}/connect`, {
+      const response = await fetch(`${API_BASE}/api/v1/instances/${instanceId}/connect`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -210,7 +210,7 @@ bore ${data.local_port} --to ${data.server_host} --secret ${data.tunnel_token}`)
   }
   async function disconnectInstance(instanceId) {
     try {
-      const response = await fetch(`${API_BASE}/api/user/instances/${instanceId}/disconnect`, {
+      const response = await fetch(`${API_BASE}/api/v1/instances/${instanceId}/disconnect`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

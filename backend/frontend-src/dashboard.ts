@@ -225,7 +225,7 @@ function getActionsTemplate(instance: Instance): string {
 
 async function connectInstance(instanceId: string): Promise<void> {
     try {
-        const response = await fetch(`${API_BASE}/api/user/instances/${instanceId}/connect`, {
+        const response = await fetch(`${API_BASE}/api/v1/instances/${instanceId}/connect`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -251,7 +251,7 @@ async function connectInstance(instanceId: string): Promise<void> {
 
 async function disconnectInstance(instanceId: string): Promise<void> {
     try {
-        const response = await fetch(`${API_BASE}/api/user/instances/${instanceId}/disconnect`, {
+        const response = await fetch(`${API_BASE}/api/v1/instances/${instanceId}/disconnect`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`

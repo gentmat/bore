@@ -15,8 +15,8 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript and frontend
+RUN npm run build:all
 
 # Copy docs directory to dist for swagger
 RUN cp -r docs dist/

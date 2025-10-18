@@ -20,7 +20,7 @@ document.getElementById('loginForm')!.addEventListener('submit', async (e: Event
     submitBtn.disabled = true;
     
     try {
-        const response = await fetch(`${API_BASE}/api/auth/login`, {
+        const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

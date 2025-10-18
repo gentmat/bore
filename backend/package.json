@@ -14,6 +14,7 @@
     "test:all": "npm run test:unit",
     "seed:test": "node tests/fixtures/seed.js seed",
     "seed:clear": "node tests/fixtures/seed.js clear",
+    "create-admin": "ts-node scripts/create-admin.ts",
     "benchmark:migrations": "node scripts/benchmark-migrations.js",
     "setup": "./scripts/setup-everything.sh",
     "build": "tsc -p tsconfig.build.json",

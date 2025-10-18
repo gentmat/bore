@@ -10,7 +10,7 @@
     const messageBox = document.getElementById("message");
     messageBox.classList.remove("show", "success", "error");
     try {
-      const response = await fetch(`${API_BASE}/api/user/claim-plan`, {
+      const response = await fetch(`${API_BASE}/api/v1/auth/claim-plan`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

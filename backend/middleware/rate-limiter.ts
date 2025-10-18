@@ -52,17 +52,12 @@ const tunnelLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    // Rate limit per user, fall back to IP with proper IPv6 handling
+    // Rate limit per user, fall back to IP
     if (req.user?.user_id) {
       return req.user.user_id;
     }
-    // Use a simple IP-based fallback that doesn't trigger IPv6 validation
-    const ip =
-      req.ip ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
-      "unknown";
-    return ip.toString();
+    // Use IP fallback - express-rate-limit will handle IPv6 properly
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || "unknown";
   },
 });
 
@@ -77,17 +72,12 @@ const createInstanceLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request): string => {
-    // Rate limit per user, fall back to IP with proper IPv6 handling
+    // Rate limit per user, fall back to IP
     if (req.user?.user_id) {
       return req.user.user_id;
     }
-    // Use a simple IP-based fallback that doesn't trigger IPv6 validation
-    const ip =
-      req.ip ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
-      "unknown";
-    return ip.toString();
+    // Use IP fallback - express-rate-limit will handle IPv6 properly
+    return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || "unknown";
   },
 });
 

@@ -70,6 +70,12 @@ services:
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
       ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-alerts@bore.com}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      
+      # Admin Configuration (optional - auto-creates admin user)
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Admin User}
+      ADMIN_AUTO_CREATE: ${ADMIN_AUTO_CREATE:-false}
     depends_on:
       postgres:
         condition: service_healthy

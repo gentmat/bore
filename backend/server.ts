@@ -34,6 +34,7 @@ import {
 import { alerts } from "./alerting";
 import redisService from "./services/redis-service";
 import { cleanupExpiredTokens } from "./middleware/refresh-token";
+import { createAdminUser } from "./scripts/create-admin";
 
 // Import routes
 import authRoutes from "./routes/auth-routes";
@@ -190,39 +191,27 @@ app.use("/api/v1/user/instances", broadcastMiddleware, instanceRoutes); // Alias
 app.use("/api/v1/internal", broadcastMiddleware, internalRoutes);
 
 // Backward compatibility - redirect old API paths to v1
-app.use("/api/auth*", (req: Request, res: Response, next: NextFunction) => {
-  if (!req.path.startsWith("/api/v1/")) {
-    const newPath = req.path.replace("/api/", "/api/v1/");
-    return res.redirect(308, newPath); // 308 = Permanent Redirect (preserves method)
-  }
-  next();
+app.use("/api/auth*", (req: Request, res: Response) => {
+  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
+  return res.redirect(308, newPath); // 308 = Permanent Redirect (preserves method)
 });
 
 app.use(
   "/api/instances*",
-  (req: Request, res: Response, next: NextFunction) => {
-    if (!req.path.startsWith("/api/v1/")) {
-      const newPath = req.path.replace("/api/", "/api/v1/");
-      return res.redirect(308, newPath);
-    }
-    next();
+  (req: Request, res: Response) => {
+    const newPath = req.originalUrl.replace("/api/", "/api/v1/");
+    return res.redirect(308, newPath);
   },
 );
 
-app.use("/api/admin*", (req: Request, res: Response, next: NextFunction) => {
-  if (!req.path.startsWith("/api/v1/")) {
-    const newPath = req.path.replace("/api/", "/api/v1/");
-    return res.redirect(308, newPath);
-  }
-  next();
+app.use("/api/admin*", (req: Request, res: Response) => {
+  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
+  return res.redirect(308, newPath);
 });
 
-app.use("/api/internal*", (req: Request, res: Response, next: NextFunction) => {
-  if (!req.path.startsWith("/api/v1/")) {
-    const newPath = req.path.replace("/api/", "/api/v1/");
-    return res.redirect(308, newPath);
-  }
-  next();
+app.use("/api/internal*", (req: Request, res: Response) => {
+  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
+  return res.redirect(308, newPath);
 });
 
 /**
@@ -457,6 +446,15 @@ async function startServer(): Promise<void> {
     // Initialize database
     await initializeDatabase();
     logger.info("✅ Database initialized");
+
+    // Auto-create admin user if configured
+    if (config.admin.autoCreate && config.admin.email && config.admin.password) {
+      try {
+        await createAdminUser();
+      } catch (error) {
+        logger.warn("⚠️  Failed to auto-create admin user", { error: error as Error });
+      }
+    }
 
     // Initialize Redis (optional - won't fail if unavailable)
     if (config.redis.enabled) {
