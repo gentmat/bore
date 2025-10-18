@@ -1,11 +1,22 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
   workflow_dispatch:
+    inputs:
+      run_docker:
+        description: "Build and publish Docker images"
+        required: false
+        default: true
+        type: boolean
+      test_level:
+        description: "Test level to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - unit-only
+          - integration-only
 
 env:
   CARGO_TERM_COLOR: always
@@ -311,7 +322,7 @@ jobs:
   docker:
     name: Docker Build & Publish
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event.inputs.run_docker == 'true'
     permissions:
       contents: read
       packages: write
