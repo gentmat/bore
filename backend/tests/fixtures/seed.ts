@@ -17,6 +17,16 @@ interface SeedResult {
   testPassword: string;
 }
 
+interface SeededUser {
+  id: string;
+  email: string;
+  password_hash: string;
+  name: string;
+  plan: string;
+  is_admin: boolean;
+  [key: string]: unknown;
+}
+
 async function seedDatabase(pool: Pool): Promise<SeedResult> {
   const client: PoolClient = await pool.connect();
   try {
@@ -41,7 +51,7 @@ async function seedDatabase(pool: Pool): Promise<SeedResult> {
       seededUsers.push(result.rows[0]);
     }
 
-    const instances = generateTestInstances((seededUsers[0] as any).id);
+    const instances = generateTestInstances((seededUsers[0] as SeededUser).id);
     const seededInstances: unknown[] = [];
     for (const inst of instances) {
       const result = await client.query(

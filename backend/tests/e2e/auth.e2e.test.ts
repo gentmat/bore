@@ -6,8 +6,8 @@
 import request from "supertest";
 
 // Use global test server URL
-const baseURL =
-  (global as Record<string, unknown>).TEST_BASE_URL || "http://localhost:3001";
+const baseURL: string =
+  (global as Record<string, unknown>).TEST_BASE_URL as string || "http://localhost:3001";
 
 interface TestUser {
   email: string;
@@ -26,7 +26,7 @@ let refreshToken: string;
 describe("Authentication E2E Flow", () => {
   describe("User Registration", () => {
     it("should successfully register a new user", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/signup")
         .send(testUser)
         .expect(201);
@@ -41,7 +41,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject duplicate email registration", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/signup")
         .send(testUser)
         .expect(400);
@@ -50,7 +50,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject invalid email format", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/signup")
         .send({
           email: "invalid-email",
@@ -63,7 +63,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject weak passwords", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/signup")
         .send({
           email: "newuser@example.com",
@@ -78,7 +78,7 @@ describe("Authentication E2E Flow", () => {
 
   describe("User Login", () => {
     it("should successfully login with correct credentials", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/login")
         .send({
           email: testUser.email,
@@ -95,7 +95,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject incorrect password", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/login")
         .send({
           email: testUser.email,
@@ -107,7 +107,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject non-existent user", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/login")
         .send({
           email: "nonexistent@example.com",
@@ -121,7 +121,7 @@ describe("Authentication E2E Flow", () => {
 
   describe("Protected Routes", () => {
     it("should access protected route with valid token", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .get("/api/v1/instances")
         .set("Authorization", `Bearer ${authToken}`)
         .expect(200);
@@ -130,13 +130,13 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject access without token", async () => {
-      await request(baseURL as any)
+      await request(baseURL)
         .get("/api/v1/instances")
         .expect(401);
     });
 
     it("should reject access with invalid token", async () => {
-      await request(baseURL as any)
+      await request(baseURL)
         .get("/api/v1/instances")
         .set("Authorization", "Bearer invalid-token")
         .expect(401);
@@ -145,7 +145,7 @@ describe("Authentication E2E Flow", () => {
 
   describe("Token Refresh", () => {
     it("should refresh access token with valid refresh token", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .post("/api/v1/auth/refresh")
         .send({ refreshToken })
         .expect(200);
@@ -158,14 +158,14 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject invalid refresh token", async () => {
-      await request(baseURL as any)
+      await request(baseURL)
         .post("/api/v1/auth/refresh")
         .send({ refreshToken: "invalid-refresh-token" })
         .expect(401);
     });
 
     it("should work with newly refreshed token", async () => {
-      const response = await request(baseURL as any)
+      const response = await request(baseURL)
         .get("/api/v1/instances")
         .set("Authorization", `Bearer ${authToken}`)
         .expect(200);
@@ -176,7 +176,7 @@ describe("Authentication E2E Flow", () => {
 
   describe("Logout", () => {
     it("should successfully logout and revoke refresh token", async () => {
-      await request(baseURL as any)
+      await request(baseURL)
         .post("/api/v1/auth/logout")
         .set("Authorization", `Bearer ${authToken}`)
         .send({ refreshToken })
@@ -184,7 +184,7 @@ describe("Authentication E2E Flow", () => {
     });
 
     it("should reject revoked refresh token", async () => {
-      await request(baseURL as any)
+      await request(baseURL)
         .post("/api/v1/auth/refresh")
         .send({ refreshToken })
         .expect(401);

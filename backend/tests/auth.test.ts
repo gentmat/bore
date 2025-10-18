@@ -6,6 +6,7 @@
 import request from "supertest";
 import express, { Express } from "express";
 import bodyParser from "body-parser";
+import bcrypt from "bcryptjs";
 import authRoutes from "../routes/auth-routes";
 
 // Mock rate limiters to prevent interference
@@ -19,12 +20,12 @@ jest.mock("../middleware/rate-limiter", () => ({
 // Mock database
 jest.mock("../database", () => ({
   db: {
-    getUserByEmail: jest.fn(),
-    createUser: jest.fn(),
-    getUserById: jest.fn(),
-    updateUserPlan: jest.fn(),
-    transaction: jest.fn(),
-    query: jest.fn(),
+    getUserByEmail: jest.fn() as jest.Mock,
+    createUser: jest.fn() as jest.Mock,
+    getUserById: jest.fn() as jest.Mock,
+    updateUserPlan: jest.fn() as jest.Mock,
+    transaction: jest.fn() as jest.Mock,
+    query: jest.fn() as jest.Mock,
   },
 }));
 
@@ -61,8 +62,7 @@ jest.mock("../config", () => ({
   },
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { db } = require("../database");
+import { db } from "../database";
 
 // Create test app
 function createTestApp(): Express {
@@ -148,8 +148,6 @@ describe("Auth Routes", () => {
 
   describe("POST /api/v1/auth/login", () => {
     it("should login successfully with correct credentials", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const bcrypt = require("bcryptjs");
       const mockUser = {
         id: "user_123",
         email: "test@example.com",
@@ -207,17 +205,16 @@ describe("Auth Routes", () => {
 
   describe("POST /api/v1/auth/refresh", () => {
     it("should refresh token successfully", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const {
-        validateRefreshToken,
-        revokeRefreshToken,
-      } = require("../middleware/refresh-token");
       const mockUser = {
         id: "user_123",
         email: "test@example.com",
         name: "Test User",
       };
 
+      const {
+        validateRefreshToken,
+        revokeRefreshToken,
+      } = jest.requireMock("../middleware/refresh-token");
       validateRefreshToken.mockResolvedValue({
         user_id: "user_123",
         token: "old-refresh-token",
@@ -236,8 +233,7 @@ describe("Auth Routes", () => {
     });
 
     it("should return 401 for invalid refresh token", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { validateRefreshToken } = require("../middleware/refresh-token");
+      const { validateRefreshToken } = jest.requireMock("../middleware/refresh-token");
       validateRefreshToken.mockResolvedValue(null);
 
       const response = await request(app).post("/api/v1/auth/refresh").send({

@@ -12,6 +12,28 @@ import {
 import { Request, Response, NextFunction } from "express";
 import { CapacityInfo } from "../capacity-limiter";
 
+// Define proper types for test data
+interface MockUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  plan: string;
+  isAdmin: boolean;
+  planExpires: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  [key: string]: unknown; // Index signature to match UserRecord
+}
+
+interface MockQueryResult {
+  rows: Array<{ count?: string; active?: string }>;
+  command: string;
+  rowCount: number;
+  oid: number;
+  fields: Array<{ name: string; tableID: number; columnID: number; dataTypeID: number; dataTypeSize: number; dataTypeModifier: number; format: string }>;
+}
+
 // Mock dependencies
 jest.mock("../database", () => ({
   db: {
@@ -131,7 +153,8 @@ describe("Capacity Limiter", () => {
         isAdmin: false,
         planExpires: null,
         createdAt: new Date(),
-      } as any);
+        updatedAt: new Date(),
+      } as MockUser);
 
       mockDb.query.mockResolvedValue({
         rows: [{ count: "2" }],
@@ -139,7 +162,7 @@ describe("Capacity Limiter", () => {
         rowCount: 1,
         oid: 0,
         fields: [],
-      } as any);
+      } as MockQueryResult);
 
       const result = await checkUserQuota("user_123");
 
@@ -158,7 +181,8 @@ describe("Capacity Limiter", () => {
         isAdmin: false,
         planExpires: null,
         createdAt: new Date(),
-      } as any);
+        updatedAt: new Date(),
+      } as MockUser);
 
       mockDb.query.mockResolvedValue({
         rows: [{ count: "1" }],
@@ -166,7 +190,7 @@ describe("Capacity Limiter", () => {
         rowCount: 1,
         oid: 0,
         fields: [],
-      } as any);
+      } as MockQueryResult);
 
       const result = await checkUserQuota("user_123");
 
@@ -186,7 +210,8 @@ describe("Capacity Limiter", () => {
         isAdmin: false,
         planExpires: null,
         createdAt: new Date(),
-      } as any);
+        updatedAt: new Date(),
+      } as MockUser);
 
       mockDb.query.mockResolvedValue({
         rows: [{ count: "15" }],
@@ -194,7 +219,7 @@ describe("Capacity Limiter", () => {
         rowCount: 1,
         oid: 0,
         fields: [],
-      } as any);
+      } as MockQueryResult);
 
       const result = await checkUserQuota("user_123");
 
@@ -203,7 +228,7 @@ describe("Capacity Limiter", () => {
     });
 
     it("should handle user not found", async () => {
-      mockDb.getUserById.mockResolvedValue(null as any);
+      mockDb.getUserById.mockResolvedValue(null as unknown as MockUser);
 
       const result = await checkUserQuota("user_nonexistent");
 
@@ -261,14 +286,15 @@ describe("Capacity Limiter", () => {
         isAdmin: false,
         planExpires: null,
         createdAt: new Date(),
-      } as any);
+        updatedAt: new Date(),
+      } as MockUser);
       mockDb.query.mockResolvedValue({
         rows: [{ count: "1" }],
         command: "SELECT",
         rowCount: 1,
         oid: 0,
         fields: [],
-      } as any);
+      } as MockQueryResult);
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 
@@ -320,14 +346,15 @@ describe("Capacity Limiter", () => {
         isAdmin: false,
         planExpires: null,
         createdAt: new Date(),
-      } as any);
+        updatedAt: new Date(),
+      } as MockUser);
       mockDb.query.mockResolvedValue({
         rows: [{ count: "1" }],
         command: "SELECT",
         rowCount: 1,
         oid: 0,
         fields: [],
-      } as any);
+      } as MockQueryResult);
 
       await requireCapacity(req as RequestWithUser, res as Response, next);
 

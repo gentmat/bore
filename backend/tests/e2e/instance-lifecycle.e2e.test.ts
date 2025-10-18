@@ -21,6 +21,13 @@ interface TestUser {
   name: string;
 }
 
+interface TestInstance {
+  id: string;
+  name: string;
+  status: string;
+  public_url?: string;
+}
+
 let authToken: string;
 let instanceId: string;
 const testUser: TestUser = {
@@ -73,7 +80,7 @@ describe("Instance Lifecycle E2E", () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
 
-      const instance = response.body.find((i: any) => i.id === instanceId);
+      const instance = response.body.find((i: TestInstance) => i.id === instanceId);
       expect(instance).toBeDefined();
       expect(instance.name).toBe("E2E Test Instance");
     });
@@ -196,7 +203,7 @@ describe("Instance Lifecycle E2E", () => {
         .set("Authorization", `Bearer ${authToken}`)
         .expect(200);
 
-      const instance = response.body.find((i: any) => i.id === instanceId);
+      const instance = response.body.find((i: TestInstance) => i.id === instanceId);
       expect(instance).toBeUndefined();
     });
   });

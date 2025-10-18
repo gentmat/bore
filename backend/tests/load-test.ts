@@ -48,6 +48,26 @@ interface RequestResult {
   error?: string;
 }
 
+interface AuthResponseData {
+  token: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    plan: string;
+  };
+}
+
+interface InstanceResponseData {
+  id: string;
+  name: string;
+  status: string;
+  user_id: string;
+  local_port: number;
+  region: string;
+}
+
 interface User {
   id: number;
   token: string | null;
@@ -205,8 +225,8 @@ async function simulateUser(userId: number): Promise<void> {
       password: "Test123456!",
     });
 
-    if (authResult.data && (authResult.data as any).token) {
-      user.token = (authResult.data as any).token;
+    if (authResult.data && (authResult.data as AuthResponseData).token) {
+      user.token = (authResult.data as AuthResponseData).token;
     }
 
     while (testRunning) {
@@ -228,8 +248,8 @@ async function simulateUser(userId: number): Promise<void> {
             user.token,
           );
 
-          if (createResult.data && (createResult.data as any).id) {
-            user.instanceId = (createResult.data as any).id;
+          if (createResult.data && (createResult.data as InstanceResponseData).id) {
+            user.instanceId = (createResult.data as InstanceResponseData).id;
           }
         }
 

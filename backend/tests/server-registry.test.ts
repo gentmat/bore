@@ -16,6 +16,11 @@ import { db } from "../database";
 import * as redisService from "../services/redis-service";
 import config from "../config";
 
+interface MockRedisClient {
+  setEx: jest.Mock;
+  get: jest.Mock;
+}
+
 // Mock dependencies
 jest.mock("../database");
 jest.mock("../services/redis-service");
@@ -79,11 +84,11 @@ describe("Server Registry", () => {
 
     it("should store in Redis when enabled", async () => {
       config.redis.enabled = true;
-      const mockClient = {
+      const mockClient: MockRedisClient = {
         setEx: jest.fn().mockResolvedValue(undefined),
         get: jest.fn(),
       };
-      jest.spyOn(redisService, "getClient").mockReturnValue(mockClient as any);
+      jest.spyOn(redisService, "getClient").mockReturnValue(mockClient as unknown as ReturnType<typeof redisService.getClient>);
       (mockDb.query as jest.Mock).mockResolvedValue({});
 
       await registerServer({
