@@ -6,7 +6,7 @@
 declare global {
   namespace Express {
     interface Request {
-      id?: string;
+      id: string;
       user?: {
         user_id: string;
         email: string;
@@ -40,5 +40,17 @@ declare global {
     }
   }
 }
+
+/**
+ * Type alias for authenticated requests
+ */
+export type AuthRequest = Express.Request & {
+  user: {
+    user_id: string;
+    email: string;
+    plan: string;
+  };
+  id: string;
+};
 
 export {};

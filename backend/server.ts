@@ -232,7 +232,7 @@ app.get(
   "/api/v1/events/status",
   authenticateJWT,
   (req: Request, res: Response) => {
-    const userId = (req as { user: { user_id: string } }).user.user_id;
+    const userId = (req as any).user.user_id;
 
     // Set SSE headers
     res.setHeader("Content-Type", "text/event-stream");

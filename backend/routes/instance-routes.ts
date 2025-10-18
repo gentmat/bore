@@ -1,16 +1,20 @@
-import express, { Request, Response, Router } from 'express';
-import crypto from 'crypto';
-import config from '../config';
-import { db } from '../database';
-import { authenticateJWT } from '../auth-middleware';
-import { incrementCounter, recordHistogram } from '../metrics';
-import { schemas, validate } from '../middleware/validation';
-import { createInstanceLimiter, tunnelLimiter } from '../middleware/rate-limiter';
-import { ErrorResponses } from '../utils/error-handler';
-import redisService from '../services/redis-service';
-import { requireCapacity } from '../capacity-limiter';
-import { logger } from '../utils/logger';
-import { getBestServer } from '../server-registry';
+import express, { Request, Response, Router } from "express";
+import crypto from "crypto";
+import config from "../config";
+import { db } from "../database";
+import { authenticateJWT } from "../auth-middleware";
+import { incrementCounter, recordHistogram } from "../metrics";
+import { schemas, validate } from "../middleware/validation";
+import {
+  createInstanceLimiter,
+  tunnelLimiter,
+} from "../middleware/rate-limiter";
+import { ErrorResponses } from "../utils/error-handler";
+import redisService from "../services/redis-service";
+import { requireCapacity } from "../capacity-limiter";
+import { logger } from "../utils/logger";
+import { getBestServer } from "../server-registry";
+import { AuthRequest } from "../types/express";
 
 const router: Router = express.Router();
 
@@ -84,15 +88,8 @@ interface UptimeMetrics {
 
 /**
  * Authenticated request with user
+ * Using global Express.Request interface extended in types/express.d.ts
  */
-interface AuthRequest extends Request {
-  user: {
-    user_id: string;
-    email: string;
-    plan: string;
-  };
-  id?: string;
-}
 
 /**
  * Get heartbeat timestamp for instance (Redis-aware)
@@ -108,7 +105,10 @@ async function getHeartbeat(instanceId: string): Promise<number | null> {
 /**
  * Set heartbeat timestamp for instance (Redis-aware)
  */
-async function setHeartbeat(instanceId: string, timestamp: number): Promise<void> {
+async function setHeartbeat(
+  instanceId: string,
+  timestamp: number,
+): Promise<void> {
   if (config.redis.enabled) {
     await redisService.heartbeats.set(instanceId, timestamp, 60);
   }
@@ -127,353 +127,461 @@ async function deleteHeartbeat(instanceId: string): Promise<void> {
 }
 
 // Get all instances for user
-router.get('/', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instances = await db.getInstancesByUserId(authReq.user.user_id);
-    
-    // Add heartbeat age to each instance (using camelCase)
-    const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(instances.map(async (instance) => {
-      const lastHeartbeat = await getHeartbeat(instance.id);
-      return {
-        ...instance,
-        tunnelTokenExpiresAt: instance.tunnelTokenExpiresAt ? new Date(instance.tunnelTokenExpiresAt) : null,
-        createdAt: new Date(instance.createdAt),
-        updatedAt: new Date(instance.updatedAt),
-        lastHeartbeat: lastHeartbeat,
-        heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null
-      };
-    }));
-    
-    // Wrap in object for client compatibility
-    res.json({ instances: withHeartbeat });
-  } catch (error) {
-    logger.error('List instances error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to list instances', (req as AuthRequest).id);
-  }
-});
+router.get(
+  "/",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instances = await db.getInstancesByUserId(authReq.user.user_id);
+
+      // Add heartbeat age to each instance (using camelCase)
+      const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(
+        instances.map(async (instance) => {
+          const lastHeartbeat = await getHeartbeat(instance.id);
+          return {
+            ...instance,
+            tunnelTokenExpiresAt: instance.tunnelTokenExpiresAt
+              ? new Date(instance.tunnelTokenExpiresAt)
+              : null,
+            createdAt: new Date(instance.createdAt),
+            updatedAt: new Date(instance.updatedAt),
+            lastHeartbeat: lastHeartbeat,
+            heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
+          };
+        }),
+      );
+
+      // Wrap in object for client compatibility
+      res.json({ instances: withHeartbeat });
+    } catch (error) {
+      logger.error("List instances error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to list instances",
+        (req as AuthRequest).id,
+      );
+    }
+  },
+);
 
 // Create instance
-router.post('/', authenticateJWT, createInstanceLimiter, requireCapacity, validate(schemas.createInstance), async (req: Request, res: Response): Promise<void> => {
-  // req.body is now normalized to snake_case by validation middleware
-  const { name, local_port, region, server_host } = req.body;
-  const authReq = req as AuthRequest;
-  const userId = authReq.user.user_id;
-  
-  try {
-    const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Database layer expects snake_case and returns camelCase
-    const instance = await db.createInstance({
-      id: instanceId,
-      user_id: userId,
-      name,
-      local_port,
-      region: region || 'us-east',
-      server_host: server_host || BORE_SERVER_HOST,
-      status: 'inactive'
-    });
-    
-    // Response is already in camelCase from db.createInstance
-    res.status(201).json(instance);
-  } catch (error) {
-    logger.error('Create instance error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to create instance', authReq.id);
-  }
-});
+router.post(
+  "/",
+  authenticateJWT,
+  createInstanceLimiter,
+  requireCapacity,
+  validate(schemas.createInstance),
+  async (req: Request, res: Response): Promise<void> => {
+    // req.body is now normalized to snake_case by validation middleware
+    const { name, local_port, region, server_host } = req.body;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user.user_id;
+
+    try {
+      const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Database layer expects snake_case and returns camelCase
+      const instance = await db.createInstance({
+        id: instanceId,
+        user_id: userId,
+        name,
+        local_port,
+        region: region || "us-east",
+        server_host: server_host || BORE_SERVER_HOST,
+        status: "inactive",
+      });
+
+      // Response is already in camelCase from db.createInstance
+      res.status(201).json(instance);
+    } catch (error) {
+      logger.error("Create instance error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to create instance",
+        authReq.id,
+      );
+    }
+  },
+);
 
 // Delete instance
-router.delete('/:id', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instanceId = req.params.id as string;
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
+router.delete(
+  "/:id",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      await db.deleteInstance(instanceId);
+      await deleteHeartbeat(instanceId);
+
+      res.json({ success: true });
+    } catch (error) {
+      logger.error("Delete instance error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to delete instance",
+        (req as AuthRequest).id,
+      );
     }
-    
-    await db.deleteInstance(instanceId);
-    await deleteHeartbeat(instanceId);
-    
-    res.json({ success: true });
-  } catch (error) {
-    logger.error('Delete instance error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to delete instance', (req as AuthRequest).id);
-  }
-});
+  },
+);
 
 // Rename instance
-router.patch('/:id', authenticateJWT, validate(schemas.renameInstance), async (req: Request, res: Response): Promise<void> => {
-  const { name } = req.body;
-  const authReq = req as AuthRequest;
-  const instanceId = req.params.id as string;
-  
-  try {
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
+router.patch(
+  "/:id",
+  authenticateJWT,
+  validate(schemas.renameInstance),
+  async (req: Request, res: Response): Promise<void> => {
+    const { name } = req.body;
+    const authReq = req as AuthRequest;
+    const instanceId = req.params.id as string;
+
+    try {
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      // Validation middleware already checks this, but keeping for extra safety
+      if (!name) {
+        ErrorResponses.badRequest(res, "Name is required", null, authReq.id);
+        return;
+      }
+
+      const updated = await db.updateInstance(instanceId, { name });
+      res.json({ success: true, instance: updated });
+    } catch (error) {
+      logger.error("Rename instance error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to rename instance",
+        authReq.id,
+      );
     }
-    
-    // Validation middleware already checks this, but keeping for extra safety
-    if (!name) {
-      ErrorResponses.badRequest(res, 'Name is required', null, authReq.id);
-      return;
-    }
-    
-    const updated = await db.updateInstance(instanceId, { name });
-    res.json({ success: true, instance: updated });
-  } catch (error) {
-    logger.error('Rename instance error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to rename instance', authReq.id);
-  }
-});
+  },
+);
 
 // Heartbeat endpoint
-router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), async (req: Request, res: Response): Promise<void> => {
-  const startTime = Date.now();
-  const authReq = req as AuthRequest;
-  const instanceId = req.params.id as string;
-  
-  try {
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
-    }
-    
-    // Update heartbeat timestamp
-    await setHeartbeat(instance.id, Date.now());
-    incrementCounter('heartbeatsTotal');
-    
-    // Store health metrics (req.body is normalized to snake_case)
-    const { vscode_responsive, last_activity, cpu_usage, memory_usage, has_code_server } = req.body || {};
-    if (vscode_responsive !== undefined) {
-      await db.saveHealthMetrics(instance.id, {
+router.post(
+  "/:id/heartbeat",
+  authenticateJWT,
+  validate(schemas.heartbeat),
+  async (req: Request, res: Response): Promise<void> => {
+    const startTime = Date.now();
+    const authReq = req as AuthRequest;
+    const instanceId = req.params.id as string;
+
+    try {
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      // Update heartbeat timestamp
+      await setHeartbeat(instance.id, Date.now());
+      incrementCounter("heartbeatsTotal");
+
+      // Store health metrics (req.body is normalized to snake_case)
+      const {
         vscode_responsive,
         last_activity,
         cpu_usage,
         memory_usage,
-        has_code_server
-      });
+        has_code_server,
+      } = req.body || {};
+      if (vscode_responsive !== undefined) {
+        await db.saveHealthMetrics(instance.id, {
+          vscode_responsive,
+          last_activity,
+          cpu_usage,
+          memory_usage,
+          has_code_server,
+        });
+      }
+
+      // Determine status using three-tier logic
+      const { status, reason } = await determineInstanceStatus(
+        instance as Instance,
+      );
+
+      const oldStatus = instance.status;
+      if (oldStatus !== status) {
+        await db.updateInstance(instance.id, { status, status_reason: reason });
+        await db.addStatusHistory(instance.id, status, reason);
+
+        // Broadcast will be handled by caller (server.js)
+        res.locals.statusChanged = true;
+        res.locals.newStatus = status;
+        res.locals.instance = instance;
+      }
+
+      recordHistogram("heartbeatResponseTimes", Date.now() - startTime);
+      res.json({ success: true, status, reason });
+    } catch (error) {
+      logger.error("Heartbeat error", error as Error);
+      ErrorResponses.internalError(res, "Heartbeat failed", authReq.id);
     }
-    
-    // Determine status using three-tier logic
-    const { status, reason } = await determineInstanceStatus(instance as Instance);
-    
-    const oldStatus = instance.status;
-    if (oldStatus !== status) {
-      await db.updateInstance(instance.id, { status, status_reason: reason });
-      await db.addStatusHistory(instance.id, status, reason);
-      
-      // Broadcast will be handled by caller (server.js)
-      res.locals.statusChanged = true;
-      res.locals.newStatus = status;
-      res.locals.instance = instance;
-    }
-    
-    recordHistogram('heartbeatResponseTimes', Date.now() - startTime);
-    res.json({ success: true, status, reason });
-  } catch (error) {
-    logger.error('Heartbeat error', error as Error);
-    ErrorResponses.internalError(res, 'Heartbeat failed', authReq.id);
-  }
-});
+  },
+);
 
 // Connect to instance (get tunnel token)
-router.post('/:id/connect', authenticateJWT, tunnelLimiter, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instanceId = req.params.id as string;
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
-    }
-    
-    // LOAD BALANCING: Get least loaded bore-server
-    const bestServer = await getBestServer();
-    
-    if (!bestServer) {
-      ErrorResponses.serviceUnavailable(res, 'All servers at capacity. Please try again later.', authReq.id);
-      return;
-    }
-    
-    // Delete old token if exists (using camelCase field)
-    if (instance.currentTunnelToken) {
-      await db.deleteTunnelToken(instance.currentTunnelToken);
-    }
-    
-    // Generate new tunnel token with tk_ prefix
-    // Prefix distinguishes tunnel tokens from legacy shared secrets (which may also be hex)
-    const tunnelToken = 'tk_' + crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + config.tokens.tunnel.expiresIn);
-    
-    await db.saveTunnelToken(tunnelToken, instance.id, authReq.user.user_id, expiresAt);
-    await db.updateInstance(instance.id, {
-      current_tunnel_token: tunnelToken,
-      tunnel_token_expires_at: expiresAt,
-      assigned_server: bestServer.id  // Track which server this tunnel uses
-    });
-    
-    res.json({
-      // Required fields for Rust client (snake_case)
-      instance_id: instance.id,
-      tunnel_token: tunnelToken,
-      server_host: bestServer.host,
-      server_port: bestServer.port,
-      local_port: instance.localPort,
-      remote_port: 0, // Will be set when tunnel connects
-      ttl: Math.floor(config.tokens.tunnel.expiresIn / 1000), // Time-to-live in seconds
-      expires_at: expiresAt.toISOString(),
-      // Also include camelCase for TypeScript/JavaScript clients
-      instanceId: instance.id,
-      tunnelToken: tunnelToken,
-      boreServerHost: bestServer.host,
-      boreServerPort: bestServer.port,
-      localPort: instance.localPort,
-      remotePort: 0,
-      expiresAt: expiresAt.toISOString(),
-      serverInfo: {
-        serverId: bestServer.id,
-        utilization: ((bestServer.currentLoad / bestServer.maxConcurrentTunnels) * 100).toFixed(1) + '%'
+router.post(
+  "/:id/connect",
+  authenticateJWT,
+  tunnelLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
       }
-    });
-  } catch (error) {
-    logger.error('Connect error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to connect', (req as AuthRequest).id);
-  }
-});
+
+      // LOAD BALANCING: Get least loaded bore-server
+      const bestServer = await getBestServer();
+
+      if (!bestServer) {
+        ErrorResponses.serviceUnavailable(
+          res,
+          "All servers at capacity. Please try again later.",
+          authReq.id,
+        );
+        return;
+      }
+
+      // Delete old token if exists (using camelCase field)
+      if (instance.currentTunnelToken) {
+        await db.deleteTunnelToken(instance.currentTunnelToken);
+      }
+
+      // Generate new tunnel token with tk_ prefix
+      // Prefix distinguishes tunnel tokens from legacy shared secrets (which may also be hex)
+      const tunnelToken = "tk_" + crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + config.tokens.tunnel.expiresIn);
+
+      await db.saveTunnelToken(
+        tunnelToken,
+        instance.id,
+        authReq.user.user_id,
+        expiresAt,
+      );
+      await db.updateInstance(instance.id, {
+        current_tunnel_token: tunnelToken,
+        tunnel_token_expires_at: expiresAt,
+        assigned_server: bestServer.id, // Track which server this tunnel uses
+      });
+
+      res.json({
+        // Required fields for Rust client (snake_case)
+        instance_id: instance.id,
+        tunnel_token: tunnelToken,
+        server_host: bestServer.host,
+        server_port: bestServer.port,
+        local_port: instance.localPort,
+        remote_port: 0, // Will be set when tunnel connects
+        ttl: Math.floor(config.tokens.tunnel.expiresIn / 1000), // Time-to-live in seconds
+        expires_at: expiresAt.toISOString(),
+        // Also include camelCase for TypeScript/JavaScript clients
+        instanceId: instance.id,
+        tunnelToken: tunnelToken,
+        boreServerHost: bestServer.host,
+        boreServerPort: bestServer.port,
+        localPort: instance.localPort,
+        remotePort: 0,
+        expiresAt: expiresAt.toISOString(),
+        serverInfo: {
+          serverId: bestServer.id,
+          utilization:
+            (
+              (bestServer.currentLoad / bestServer.maxConcurrentTunnels) *
+              100
+            ).toFixed(1) + "%",
+        },
+      });
+    } catch (error) {
+      logger.error("Connect error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to connect",
+        (req as AuthRequest).id,
+      );
+    }
+  },
+);
 
 // Disconnect instance
-router.post('/:id/disconnect', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instanceId = req.params.id as string;
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
+router.post(
+  "/:id/disconnect",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      // Delete tunnel token (using camelCase field)
+      if (instance.currentTunnelToken) {
+        await db.deleteTunnelToken(instance.currentTunnelToken);
+      }
+
+      // Update instance
+      await db.updateInstance(instance.id, {
+        status: "inactive",
+        tunnel_connected: false,
+        public_url: null,
+        remote_port: null,
+        current_tunnel_token: null,
+        tunnel_token_expires_at: null,
+      });
+
+      // Clean up heartbeat (Redis-aware)
+      await deleteHeartbeat(instance.id);
+
+      res.json({ success: true });
+    } catch (error) {
+      logger.error("Disconnect error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to disconnect",
+        (req as AuthRequest).id,
+      );
     }
-    
-    // Delete tunnel token (using camelCase field)
-    if (instance.currentTunnelToken) {
-      await db.deleteTunnelToken(instance.currentTunnelToken);
-    }
-    
-    // Update instance
-    await db.updateInstance(instance.id, {
-      status: 'inactive',
-      tunnel_connected: false,
-      public_url: null,
-      remote_port: null,
-      current_tunnel_token: null,
-      tunnel_token_expires_at: null
-    });
-    
-    // Clean up heartbeat (Redis-aware)
-    await deleteHeartbeat(instance.id);
-    
-    res.json({ success: true });
-  } catch (error) {
-    logger.error('Disconnect error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to disconnect', (req as AuthRequest).id);
-  }
-});
+  },
+);
 
 // Get instance status history
-router.get('/:id/status-history', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instanceId = req.params.id as string;
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
+router.get(
+  "/:id/status-history",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      const history = await db.getStatusHistory(instance.id);
+      const healthMetrics = await db.getLatestHealthMetrics(instance.id);
+      const lastHeartbeat = await getHeartbeat(instance.id);
+
+      res.json({
+        instanceId: instance.id,
+        currentStatus: instance.status,
+        statusReason: instance.statusReason,
+        healthMetrics: healthMetrics || {},
+        lastHeartbeat: lastHeartbeat,
+        heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
+        statusHistory: history,
+        uptimeData: calculateUptimeMetrics(history as StatusHistoryRecord[]),
+      });
+    } catch (error) {
+      logger.error("Status history error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to get status history",
+        (req as AuthRequest).id,
+      );
     }
-    
-    const history = await db.getStatusHistory(instance.id);
-    const healthMetrics = await db.getLatestHealthMetrics(instance.id);
-    const lastHeartbeat = await getHeartbeat(instance.id);
-    
-    res.json({
-      instanceId: instance.id,
-      currentStatus: instance.status,
-      statusReason: instance.statusReason,
-      healthMetrics: healthMetrics || {},
-      lastHeartbeat: lastHeartbeat,
-      heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
-      statusHistory: history,
-      uptimeData: calculateUptimeMetrics(history as StatusHistoryRecord[])
-    });
-  } catch (error) {
-    logger.error('Status history error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to get status history', (req as AuthRequest).id);
-  }
-});
+  },
+);
 
 // Get instance health metrics
-router.get('/:id/health', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    const instanceId = req.params.id as string;
-    const instance = await db.getInstanceById(instanceId);
-    
-    if (!instance || instance.userId !== authReq.user.user_id) {
-      ErrorResponses.notFound(res, 'Instance', authReq.id);
-      return;
+router.get(
+  "/:id/health",
+  authenticateJWT,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      const healthMetrics = await db.getLatestHealthMetrics(instance.id);
+      const lastHeartbeat = await getHeartbeat(instance.id);
+
+      res.json({
+        instanceId: instance.id,
+        status: instance.status,
+        statusReason: instance.statusReason,
+        tunnelConnected: instance.tunnelConnected,
+        ...healthMetrics,
+        lastHeartbeat: lastHeartbeat,
+        heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
+      });
+    } catch (error) {
+      logger.error("Health metrics error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to get health metrics",
+        (req as AuthRequest).id,
+      );
     }
-    
-    const healthMetrics = await db.getLatestHealthMetrics(instance.id);
-    const lastHeartbeat = await getHeartbeat(instance.id);
-    
-    res.json({
-      instanceId: instance.id,
-      status: instance.status,
-      statusReason: instance.statusReason,
-      tunnelConnected: instance.tunnelConnected,
-      ...healthMetrics,
-      lastHeartbeat: lastHeartbeat,
-      heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null
-    });
-  } catch (error) {
-    logger.error('Health metrics error', error as Error);
-    ErrorResponses.internalError(res, 'Failed to get health metrics', (req as AuthRequest).id);
-  }
-});
+  },
+);
 
 /**
  * Helper: Determine instance status based on heartbeat and health metrics
  */
-async function determineInstanceStatus(instance: Instance): Promise<{ status: string; reason: string }> {
+async function determineInstanceStatus(
+  instance: Instance,
+): Promise<{ status: string; reason: string }> {
   const now = Date.now();
   const lastHeartbeat = await getHeartbeat(instance.id);
-  const healthMetrics = await db.getLatestHealthMetrics(instance.id) || {} as HealthMetrics;
-  
-  if (instance.tunnelConnected === false || instance.status === 'offline') {
-    return { status: 'offline', reason: 'Tunnel disconnected' };
+  const healthMetrics =
+    (await db.getLatestHealthMetrics(instance.id)) || ({} as HealthMetrics);
+
+  if (instance.tunnelConnected === false || instance.status === "offline") {
+    return { status: "offline", reason: "Tunnel disconnected" };
   }
-  
-  if (!lastHeartbeat || (now - lastHeartbeat) > HEARTBEAT_TIMEOUT) {
-    return { status: 'offline', reason: 'Heartbeat timeout' };
+
+  if (!lastHeartbeat || now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
+    return { status: "offline", reason: "Heartbeat timeout" };
   }
-  
+
   if (healthMetrics.hasCodeServer && healthMetrics.vscodeResponsive === false) {
-    return { status: 'degraded', reason: 'VSCode not responding' };
+    return { status: "degraded", reason: "VSCode not responding" };
   }
-  
-  if (healthMetrics.lastActivity && (now / 1000 - healthMetrics.lastActivity) > config.heartbeat.idleTimeout) {
-    return { status: 'idle', reason: `No activity for ${config.heartbeat.idleTimeout / 60}+ minutes` };
+
+  if (
+    healthMetrics.lastActivity &&
+    now / 1000 - healthMetrics.lastActivity > config.heartbeat.idleTimeout
+  ) {
+    return {
+      status: "idle",
+      reason: `No activity for ${config.heartbeat.idleTimeout / 60}+ minutes`,
+    };
   }
-  
-  return { status: 'online', reason: 'All systems operational' };
+
+  return { status: "online", reason: "All systems operational" };
 }
 
 /**
@@ -481,36 +589,43 @@ async function determineInstanceStatus(instance: Instance): Promise<{ status: st
  */
 function calculateUptimeMetrics(history: StatusHistoryRecord[]): UptimeMetrics {
   if (!history || history.length === 0) {
-    return { uptimePercentage: '0', totalDowntimeMs: 0, incidentCount: 0, historySpanMs: 0 };
+    return {
+      uptimePercentage: "0",
+      totalDowntimeMs: 0,
+      incidentCount: 0,
+      historySpanMs: 0,
+    };
   }
-  
-  // Database returns history in DESC order (newest first), but we need ascending 
+
+  // Database returns history in DESC order (newest first), but we need ascending
   // (oldest first) for proper duration calculation: next.timestamp - current.timestamp
   const sortedHistory = [...history].reverse();
-  
+
   let totalTime = 0;
   let uptimeMs = 0;
   let incidentCount = 0;
-  
+
   // Calculate intervals between status changes
   for (let i = 0; i < sortedHistory.length - 1; i++) {
     const current = sortedHistory[i];
     const next = sortedHistory[i + 1];
-    
+
     if (next && current) {
-      const duration = new Date(next.timestamp).getTime() - new Date(current.timestamp).getTime();
+      const duration =
+        new Date(next.timestamp).getTime() -
+        new Date(current.timestamp).getTime();
       totalTime += duration;
-      
-      if (current.status === 'online' || current.status === 'active') {
+
+      if (current.status === "online" || current.status === "active") {
         uptimeMs += duration;
       }
-      
-      if (current.status === 'offline' || current.status === 'degraded') {
+
+      if (current.status === "offline" || current.status === "degraded") {
         incidentCount++;
       }
     }
   }
-  
+
   // Include trailing segment: from last status entry to now
   // This is critical for accurate uptime calculation
   // After reversing, the last entry in sortedHistory is the most recent
@@ -519,22 +634,22 @@ function calculateUptimeMetrics(history: StatusHistoryRecord[]): UptimeMetrics {
     const now = Date.now();
     const lastTimestamp = new Date(lastEntry.timestamp).getTime();
     const trailingDuration = now - lastTimestamp;
-    
+
     totalTime += trailingDuration;
-    
+
     // Add to uptime if last status was online/active
-    if (lastEntry.status === 'online' || lastEntry.status === 'active') {
+    if (lastEntry.status === "online" || lastEntry.status === "active") {
       uptimeMs += trailingDuration;
     }
   }
-  
+
   const uptimePercentage = totalTime > 0 ? (uptimeMs / totalTime) * 100 : 0;
-  
+
   return {
     uptimePercentage: uptimePercentage.toFixed(2),
     totalDowntimeMs: totalTime - uptimeMs,
     incidentCount: incidentCount,
-    historySpanMs: totalTime
+    historySpanMs: totalTime,
   };
 }
 
