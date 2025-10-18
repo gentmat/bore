@@ -22,7 +22,7 @@ function createTestApp(): Express {
 
 describe('API Integration Tests', () => {
   let app: Express;
-  let testUser: any;
+  let testUser: { id: string; email: string; };
   let authToken: string;
 
   beforeAll(async () => {
@@ -110,7 +110,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('Instance Management Flow', () => {
-    let testInstance: any;
+    let testInstance: { id: string; name: string; };
 
     it('should create a new instance', async () => {
       const response = await request(app)

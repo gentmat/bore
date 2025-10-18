@@ -111,7 +111,7 @@ describe('WebSocket Tests', () => {
       const instanceId = instanceResponse.body.id;
 
       // Listen for status updates
-      clientSocket.on('status-update', (data: any) => {
+      clientSocket.on('status-update', (data: unknown) => {
         expect(data).toHaveProperty('instanceId');
         expect(data).toHaveProperty('status');
         expect(data.instanceId).toBe(instanceId);
@@ -164,7 +164,7 @@ describe('WebSocket Tests', () => {
 
     clientSocket.on('connect', () => {
       // Listen for any status updates
-      clientSocket.on('status-update', (_data: any) => {
+      clientSocket.on('status-update', (_data: unknown) => {
         // This should only fire for our user's instances
         receivedUnauthorizedUpdate = true;
       });

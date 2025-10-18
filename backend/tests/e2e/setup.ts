@@ -34,11 +34,14 @@ async function setupTestDatabase(): Promise<Pool> {
     if (result.rows.length === 0) {
       // Create test database
       await adminDb.query(`CREATE DATABASE ${dbName}`);
+      // eslint-disable-next-line no-console
       console.log(`✅ Created test database: ${dbName}`);
     } else {
+      // eslint-disable-next-line no-console
       console.log(`ℹ️  Test database already exists: ${dbName}`);
     }
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Failed to setup test database:', error);
     throw error;
   } finally {
@@ -54,6 +57,7 @@ async function setupTestDatabase(): Promise<Pool> {
     password: config.database.password,
   });
 
+  // eslint-disable-next-line no-console
   console.log('✅ Test database connection established');
   return testDb;
 }
@@ -64,6 +68,7 @@ async function setupTestDatabase(): Promise<Pool> {
 async function cleanupTestDatabase(): Promise<void> {
   if (testDb) {
     await testDb.end();
+    // eslint-disable-next-line no-console
     console.log('✅ Test database connection closed');
   }
 }
@@ -85,9 +90,11 @@ async function clearTestData(): Promise<void> {
     await testDb.query('TRUNCATE TABLE status_history CASCADE');
     await testDb.query('TRUNCATE TABLE instances CASCADE');
     await testDb.query('TRUNCATE TABLE users CASCADE');
-    
+
+    // eslint-disable-next-line no-console
     console.log('✅ Test data cleared');
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('❌ Failed to clear test data:', error);
     throw error;
   }

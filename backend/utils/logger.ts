@@ -18,7 +18,7 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 interface LogMetadata {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface LogEntry {
@@ -26,7 +26,7 @@ interface LogEntry {
   level: string;
   context: string;
   message: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface HttpLogData {
@@ -84,6 +84,7 @@ class Logger {
    */
   debug(message: string, metadata: LogMetadata = {}): void {
     if (this.shouldLog('debug')) {
+      // eslint-disable-next-line no-console
       console.log(this.format('debug', message, metadata));
     }
   }
@@ -93,6 +94,7 @@ class Logger {
    */
   info(message: string, metadata: LogMetadata = {}): void {
     if (this.shouldLog('info')) {
+      // eslint-disable-next-line no-console
       console.log(this.format('info', message, metadata));
     }
   }

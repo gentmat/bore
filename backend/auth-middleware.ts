@@ -20,6 +20,7 @@ interface JWTPayload {
   user_id: string;
   email: string;
   is_admin: boolean;
+  plan?: string;
   iat: number;
   exp: number;
 }
@@ -95,7 +96,7 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
     req.user = {
       user_id: decoded.user_id,
       email: decoded.email,
-      plan: (decoded as any).plan || 'trial'
+      plan: decoded.plan || 'trial'
     };
     next();
   } catch (err) {
@@ -226,7 +227,7 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
     req.user = {
       user_id: decoded.user_id,
       email: decoded.email,
-      plan: (decoded as any).plan || 'trial'
+      plan: decoded.plan || 'trial'
     };
   } catch (err) {
     // Invalid token, but we don't fail - just continue without user

@@ -127,7 +127,7 @@ function broadcastStatusChange(userId: string, instanceId: string, status: strin
 function broadcastMiddleware(_req: Request, res: Response, next: NextFunction): void {
   const originalJson = res.json.bind(res);
   
-  res.json = function(data: any) {
+  res.json = function(data: unknown) {
     // Check if route signaled a broadcast
     if (res.locals.broadcast && res.locals.userId && res.locals.instanceId) {
       broadcastStatusChange(res.locals.userId, res.locals.instanceId, res.locals.status);
@@ -192,7 +192,7 @@ app.use('/api/internal*', (req: Request, res: Response, next: NextFunction) => {
  * SSE endpoint for real-time status updates (v1)
  */
 app.get('/api/v1/events/status', authenticateJWT, (req: Request, res: Response) => {
-  const userId = (req as any).user.user_id;
+  const userId = (req as { user: { user_id: string } }).user.user_id;
   
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -259,7 +259,12 @@ app.get('/metrics', (_req: Request, res: Response) => {
  * Health check endpoint with dependency verification
  */
 app.get('/health', async (_req: Request, res: Response) => {
-  const health: any = {
+  const health: {
+    status: string;
+    uptime: number;
+    timestamp: number;
+    checks: Record<string, unknown>;
+  } = {
     status: 'healthy',
     uptime: process.uptime(),
     timestamp: Date.now(),

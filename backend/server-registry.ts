@@ -121,7 +121,7 @@ export async function registerServer(serverInfo: BoreServerInfo): Promise<BoreSe
   if (config.redis.enabled) {
     try {
       await redisCircuitBreaker.execute(async () => {
-        const client: any = redisService.getClient();
+        const client: { setEx: (key: string, ttl: number, value: string) => Promise<void>; get: (key: string) => Promise<string | null>; } | null = redisService.getClient();
         if (client) {
           await client.setEx(
             `${REDIS_PREFIX}${server.id}`,
@@ -162,7 +162,7 @@ export async function getActiveServers(): Promise<BoreServer[]> {
   if (config.redis.enabled) {
     try {
       const redisServers = await redisCircuitBreaker.execute(async () => {
-        const client: any = redisService.getClient();
+        const client: { setEx: (key: string, ttl: number, value: string) => Promise<void>; get: (key: string) => Promise<string | null>; } | null = redisService.getClient();
         if (!client) return [];
         
         // Use SCAN instead of KEYS to avoid blocking Redis (production-safe)
@@ -227,7 +227,7 @@ export async function updateServerLoad(serverId: string, load: number, bandwidth
   // Update Redis if enabled
   if (config.redis.enabled) {
     try {
-      const client: any = redisService.getClient();
+      const client: { setEx: (key: string, ttl: number, value: string) => Promise<void>; get: (key: string) => Promise<string | null>; } | null = redisService.getClient();
       if (client) {
         // Get existing server data
         const serverData = await client.get(`${REDIS_PREFIX}${serverId}`);

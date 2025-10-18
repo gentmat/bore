@@ -64,7 +64,7 @@ async function createRefreshToken(
   const expiresAt = getRefreshTokenExpiration();
   
   try {
-    await (db as any).query(
+    await db.query(
       `INSERT INTO refresh_tokens (token, user_id, user_agent, ip_address, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [token, userId, userAgent, ipAddress, expiresAt]
@@ -89,11 +89,11 @@ async function createRefreshToken(
  */
 async function validateRefreshToken(token: string): Promise<RefreshTokenRecord | null> {
   try {
-    const result = await (db as any).query(
-      `SELECT * FROM refresh_tokens 
+    const result = await db.query(
+      `SELECT * FROM refresh_tokens
        WHERE token = $1 AND revoked = FALSE AND expires_at > NOW()`,
       [token]
-    ) as { rows: any[] };
+    );
     
     if (result.rows.length === 0) {
       return null;
@@ -113,7 +113,7 @@ async function validateRefreshToken(token: string): Promise<RefreshTokenRecord |
  */
 async function revokeRefreshToken(token: string): Promise<boolean> {
   try {
-    await (db as any).query(
+    await db.query(
       'UPDATE refresh_tokens SET revoked = TRUE, revoked_at = NOW() WHERE token = $1',
       [token]
     );
@@ -133,7 +133,7 @@ async function revokeRefreshToken(token: string): Promise<boolean> {
  */
 async function revokeAllUserTokens(userId: string): Promise<boolean> {
   try {
-    await (db as any).query(
+    await db.query(
       'UPDATE refresh_tokens SET revoked = TRUE, revoked_at = NOW() WHERE user_id = $1 AND revoked = FALSE',
       [userId]
     );
@@ -152,9 +152,9 @@ async function revokeAllUserTokens(userId: string): Promise<boolean> {
  */
 async function cleanupExpiredTokens(): Promise<number> {
   try {
-    const result = await (db as any).query(
+    const result = await db.query(
       'DELETE FROM refresh_tokens WHERE expires_at < NOW() OR (revoked = TRUE AND revoked_at < NOW() - INTERVAL \'7 days\')'
-    ) as { rowCount: number | null };
+    );
     
     const deletedCount = result.rowCount || 0;
     if (deletedCount > 0) {
@@ -175,13 +175,13 @@ async function cleanupExpiredTokens(): Promise<number> {
  */
 async function getUserTokens(userId: string): Promise<UserTokenInfo[]> {
   try {
-    const result = await (db as any).query(
-      `SELECT token, user_agent, ip_address, created_at, expires_at 
-       FROM refresh_tokens 
+    const result = await db.query(
+      `SELECT token, user_agent, ip_address, created_at, expires_at
+       FROM refresh_tokens
        WHERE user_id = $1 AND revoked = FALSE AND expires_at > NOW()
        ORDER BY created_at DESC`,
       [userId]
-    ) as { rows: any[] };
+    );
     
     return result.rows as UserTokenInfo[];
   } catch (error) {

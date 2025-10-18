@@ -19,7 +19,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count successful requests
   skipFailedRequests: false, // Count failed requests
-  handler: (req: any, res: Response) => {
+  handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'too_many_requests',
       message: 'Too many attempts. Please try again later.',

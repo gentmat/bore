@@ -70,7 +70,7 @@ interface CapacityAlert {
 interface CapacityStats {
   system: SystemCapacityCheck;
   fleet: FleetStats;
-  servers: any[];
+  servers: unknown[];
   alerts: CapacityAlert[];
   timestamp: string;
 }
@@ -80,7 +80,7 @@ interface CapacityStats {
  */
 interface ServerInfo {
   currentLoad: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -347,7 +347,7 @@ function generateCapacityAlerts(capacityInfo: SystemCapacityCheck): CapacityAler
  * Get real-time server loads from Redis/Database
  * @returns Array of server load information
  */
-export async function getServerLoads(): Promise<any[]> {
+export async function getServerLoads(): Promise<unknown[]> {
   try {
     const { getFleetStats } = await import('./server-registry');
     const fleetStats: FleetStats = await getFleetStats();
@@ -364,7 +364,7 @@ export async function getServerLoads(): Promise<any[]> {
  */
 export function updateCapacity(newTotalCapacity: number): void {
   logger.warn('updateCapacity() modifies runtime config only. Update TOTAL_SYSTEM_CAPACITY env var for persistent changes.');
-  (CAPACITY_CONFIG as any).totalSystemCapacity = newTotalCapacity;
+  (CAPACITY_CONFIG as { totalSystemCapacity: number }).totalSystemCapacity = newTotalCapacity;
   logger.info(`✅ System capacity updated to ${newTotalCapacity} tunnels (runtime only)`);
 }
 

@@ -6,7 +6,7 @@
 import request from 'supertest';
 
 // Use global test server URL
-const baseURL = (global as any).TEST_BASE_URL || 'http://localhost:3001';
+const baseURL = (global as Record<string, unknown>).TEST_BASE_URL || 'http://localhost:3001';
 
 interface TestUser {
   email: string;

@@ -43,7 +43,7 @@ interface Stats {
 
 interface RequestResult {
   status: number;
-  data?: any;
+  data?: unknown;
   responseTime: number;
   error?: string;
 }
@@ -102,7 +102,7 @@ let testRunning = true;
 /**
  * Make HTTP request
  */
-function makeRequest(method: string, path: string, body: any = null, token: string | null = null): Promise<RequestResult> {
+function makeRequest(method: string, path: string, body: unknown = null, token: string | null = null): Promise<RequestResult> {
   return new Promise((resolve, reject) => {
     const url = new URL(path, config.target);
     const isHttps = url.protocol === 'https:';
@@ -242,7 +242,8 @@ async function simulateUser(userId: number): Promise<void> {
     }
 
   } catch (error) {
-    console.error(`User ${userId} failed to initialize:`, (error as any).message);
+    // eslint-disable-next-line no-console
+    console.error(`User ${userId} failed to initialize:`, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -294,44 +295,75 @@ function calculateStats() {
 function printProgress(elapsed: number): void {
   const calculated = calculateStats();
   const progress = ((elapsed / config.duration) * 100).toFixed(0);
-  
+
+  // eslint-disable-next-line no-console
   console.clear();
+  // eslint-disable-next-line no-console
   console.log('='.repeat(60));
+  // eslint-disable-next-line no-console
   console.log('BORE BACKEND LOAD TEST');
+  // eslint-disable-next-line no-console
   console.log('='.repeat(60));
+  // eslint-disable-next-line no-console
   console.log(`Progress: ${progress}% (${elapsed}s / ${config.duration}s)`);
+  // eslint-disable-next-line no-console
   console.log(`Users: ${config.users} | Target: ${config.target}`);
+  // eslint-disable-next-line no-console
   console.log('');
+  // eslint-disable-next-line no-console
   console.log('Requests:');
+  // eslint-disable-next-line no-console
   console.log(`  Total: ${stats.requests.total}`);
+  // eslint-disable-next-line no-console
   console.log(`  Successful: ${stats.requests.successful}`);
+  // eslint-disable-next-line no-console
   console.log(`  Failed: ${stats.requests.failed}`);
+  // eslint-disable-next-line no-console
   console.log(`  Timeout: ${stats.requests.timeout}`);
+  // eslint-disable-next-line no-console
   console.log('');
+  // eslint-disable-next-line no-console
   console.log('Response Times (ms):');
+  // eslint-disable-next-line no-console
   console.log(`  Min: ${calculated.responseTime.min}`);
+  // eslint-disable-next-line no-console
   console.log(`  Avg: ${calculated.responseTime.avg}`);
+  // eslint-disable-next-line no-console
   console.log(`  P50: ${calculated.responseTime.p50}`);
+  // eslint-disable-next-line no-console
   console.log(`  P95: ${calculated.responseTime.p95}`);
+  // eslint-disable-next-line no-console
   console.log(`  P99: ${calculated.responseTime.p99}`);
+  // eslint-disable-next-line no-console
   console.log(`  Max: ${calculated.responseTime.max}`);
+  // eslint-disable-next-line no-console
   console.log('');
+  // eslint-disable-next-line no-console
   console.log('Throughput:');
+  // eslint-disable-next-line no-console
   console.log(`  RPS: ${calculated.throughput.requestsPerSecond}`);
+  // eslint-disable-next-line no-console
   console.log(`  Success Rate: ${calculated.throughput.successRate}`);
+  // eslint-disable-next-line no-console
   console.log('');
+  // eslint-disable-next-line no-console
   console.log('Status Codes:');
   Object.entries(stats.statusCodes).forEach(([code, count]) => {
+    // eslint-disable-next-line no-console
     console.log(`  ${code}: ${count}`);
   });
-  
+
   if (Object.keys(stats.errors).length > 0) {
+    // eslint-disable-next-line no-console
     console.log('');
+    // eslint-disable-next-line no-console
     console.log('Errors:');
     Object.entries(stats.errors).forEach(([error, count]) => {
+      // eslint-disable-next-line no-console
       console.log(`  ${error}: ${count}`);
     });
   }
+  // eslint-disable-next-line no-console
   console.log('='.repeat(60));
 }
 
@@ -339,9 +371,13 @@ function printProgress(elapsed: number): void {
  * Main test execution
  */
 async function runLoadTest(): Promise<void> {
+  // eslint-disable-next-line no-console
   console.log('Starting load test...');
+  // eslint-disable-next-line no-console
   console.log(`Configuration: ${config.users} users, ${config.duration}s duration, ${config.rampUp}s ramp-up`);
+  // eslint-disable-next-line no-console
   console.log(`Target: ${config.target}`);
+  // eslint-disable-next-line no-console
   console.log('');
 
   // Ramp up users gradually
@@ -371,17 +407,24 @@ async function runLoadTest(): Promise<void> {
   testRunning = false;
 
   // Wait for active requests to complete
+  // eslint-disable-next-line no-console
   console.log('\nWaiting for active requests to complete...');
   await sleep(5000);
 
   // Final report
+  // eslint-disable-next-line no-console
   console.clear();
+  // eslint-disable-next-line no-console
   console.log('='.repeat(60));
+  // eslint-disable-next-line no-console
   console.log('LOAD TEST COMPLETED');
+  // eslint-disable-next-line no-console
   console.log('='.repeat(60));
-  
+
   const finalStats = calculateStats();
+  // eslint-disable-next-line no-console
   console.log('\nFinal Statistics:');
+  // eslint-disable-next-line no-console
   console.log(JSON.stringify({
     config,
     requests: stats.requests,
@@ -389,7 +432,8 @@ async function runLoadTest(): Promise<void> {
     statusCodes: stats.statusCodes,
     errors: stats.errors
   }, null, 2));
-  
+
+  // eslint-disable-next-line no-console
   console.log('\n' + '='.repeat(60));
   
   // Exit with appropriate code
@@ -399,6 +443,7 @@ async function runLoadTest(): Promise<void> {
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
+  // eslint-disable-next-line no-console
   console.log('\nStopping load test...');
   testRunning = false;
   setTimeout(() => process.exit(0), 2000);
@@ -407,6 +452,7 @@ process.on('SIGINT', () => {
 // Run the test
 if (require.main === module) {
   runLoadTest().catch(error => {
+    // eslint-disable-next-line no-console
     console.error('Load test failed:', error);
     process.exit(1);
   });

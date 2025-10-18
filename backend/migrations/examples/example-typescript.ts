@@ -110,6 +110,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     EXECUTE FUNCTION update_api_keys_updated_at();
   `);
 
+  // eslint-disable-next-line no-console
   console.log('✅ API keys table created with TypeScript migration');
 }
 
@@ -126,5 +127,6 @@ export async function down(pgm: MigrationBuilder): Promise<void> {
   // Drop table (indexes are automatically dropped)
   pgm.dropTable('api_keys');
 
+  // eslint-disable-next-line no-console
   console.log('✅ API keys table removed');
 }

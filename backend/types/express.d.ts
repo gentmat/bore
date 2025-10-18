@@ -3,8 +3,6 @@
  * Extends Express Request and Response types with custom properties
  */
 
-import { JWTPayload } from './index';
-
 declare global {
   namespace Express {
     interface Request {
@@ -36,8 +34,8 @@ declare global {
         status?: string;
         statusChanged?: boolean;
         newStatus?: string;
-        instance?: any;
-        responseBody?: any;
+        instance?: { id: string; userId: string };
+        responseBody?: unknown;
       };
     }
   }

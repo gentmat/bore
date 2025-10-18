@@ -194,7 +194,7 @@ describe('validate middleware', () => {
     const middleware = validate(schemas.signup);
     middleware(req, res, next);
 
-    expect((req.body as any).extraField).toBeUndefined();
+    expect((req.body as Record<string, unknown>).extraField).toBeUndefined();
     expect(next).toHaveBeenCalled();
   });
 });

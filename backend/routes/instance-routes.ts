@@ -133,7 +133,7 @@ router.get('/', authenticateJWT, async (req: Request, res: Response): Promise<vo
     const instances = await db.getInstancesByUserId(authReq.user.user_id);
     
     // Add heartbeat age to each instance (using camelCase)
-    const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(instances.map(async (instance: any) => {
+    const withHeartbeat: InstanceWithHeartbeat[] = await Promise.all(instances.map(async (instance: Instance) => {
       const lastHeartbeat = await getHeartbeat(instance.id);
       return {
         ...instance,
@@ -260,7 +260,7 @@ router.post('/:id/heartbeat', authenticateJWT, validate(schemas.heartbeat), asyn
     }
     
     // Determine status using three-tier logic
-    const { status, reason } = await determineInstanceStatus(instance as any);
+    const { status, reason } = await determineInstanceStatus(instance as Instance);
     
     const oldStatus = instance.status;
     if (oldStatus !== status) {
@@ -408,7 +408,7 @@ router.get('/:id/status-history', authenticateJWT, async (req: Request, res: Res
       lastHeartbeat: lastHeartbeat,
       heartbeatAgeMs: lastHeartbeat ? Date.now() - lastHeartbeat : null,
       statusHistory: history,
-      uptimeData: calculateUptimeMetrics(history as any)
+      uptimeData: calculateUptimeMetrics(history as StatusHistoryRecord[])
     });
   } catch (error) {
     logger.error('Status history error', error as Error);

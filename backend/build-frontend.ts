@@ -17,6 +17,7 @@ const files = [
 ];
 
 async function build(): Promise<void> {
+  // eslint-disable-next-line no-console
   console.log('🔨 Building frontend TypeScript files...\n');
   
   const buildPromises = files.map(async (file) => {
@@ -31,20 +32,24 @@ async function build(): Promise<void> {
         platform: 'browser',
         format: 'iife',
       });
+      // eslint-disable-next-line no-console
       console.log(`✅ Built ${file}.ts → public/js/${file}.js`);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error(`❌ Failed to build ${file}.ts:`, error);
       throw error;
     }
   });
 
   await Promise.all(buildPromises);
-  
+
+  // eslint-disable-next-line no-console
   console.log('\n✨ Frontend build complete!\n');
 }
 
 // Watch mode
 if (process.argv.includes('--watch')) {
+  // eslint-disable-next-line no-console
   console.log('👀 Watching for changes...\n');
   
   files.forEach((file) => {
@@ -52,6 +57,7 @@ if (process.argv.includes('--watch')) {
     
     fs.watch(srcPath, async (eventType) => {
       if (eventType === 'change') {
+        // eslint-disable-next-line no-console
         console.log(`🔄 ${file}.ts changed, rebuilding...`);
         try {
           await esbuild.build({
@@ -63,14 +69,17 @@ if (process.argv.includes('--watch')) {
             platform: 'browser',
             format: 'iife',
           });
+          // eslint-disable-next-line no-console
           console.log(`✅ Rebuilt ${file}.ts`);
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error(`❌ Build failed for ${file}.ts:`, (error as Error).message);
         }
       }
     });
   });
   
+  // eslint-disable-next-line no-console
   console.log('Watching for changes... (Press Ctrl+C to stop)\n');
   
   // Keep the process running
@@ -78,6 +87,7 @@ if (process.argv.includes('--watch')) {
 } else {
   // Build once
   build().catch((error) => {
+    // eslint-disable-next-line no-console
     console.error('\n❌ Build failed:', error);
     process.exit(1);
   });

@@ -158,7 +158,7 @@ function broadcastStatusChange(userId: string, instanceId: string, status: strin
  * @param {string} eventName - Event name
  * @param {Object} data - Event data
  */
-function emitToUser(userId: string, eventName: string, data: any): void {
+function emitToUser(userId: string, eventName: string, data: unknown): void {
   if (!io) return;
   io.to(`user:${userId}`).emit(eventName, data);
 }
@@ -168,7 +168,7 @@ function emitToUser(userId: string, eventName: string, data: any): void {
  * @param {string} eventName - Event name
  * @param {Object} data - Event data
  */
-function broadcastToAll(eventName: string, data: any): void {
+function broadcastToAll(eventName: string, data: unknown): void {
   if (!io) return;
   io.emit(eventName, data);
 }

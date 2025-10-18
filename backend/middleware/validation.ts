@@ -154,7 +154,7 @@ function validate(schema: Joi.Schema, source: RequestSource = 'body') {
     req[source] = normalized;
     
     // Also keep original for API compatibility
-    (req as any)[`${source}Original`] = value;
+    (req as Record<string, unknown>)[`${source}Original`] = value;
     
     next();
   };
@@ -166,7 +166,7 @@ function validate(schema: Joi.Schema, source: RequestSource = 'body') {
  * @param input - String to sanitize
  * @returns Sanitized string
  */
-function sanitize(input: any): any {
+function sanitize(input: unknown): unknown {
   if (typeof input !== 'string') {
     return input;
   }
@@ -207,7 +207,7 @@ function sanitize(input: any): any {
  * @param obj - Object to sanitize
  * @returns Sanitized object
  */
-function sanitizeObject(obj: any): any {
+function sanitizeObject(obj: unknown): unknown {
   if (typeof obj !== 'object' || obj === null) {
     return sanitize(obj);
   }
@@ -216,8 +216,8 @@ function sanitizeObject(obj: any): any {
     return obj.map(item => sanitizeObject(item));
   }
 
-  const sanitized: Record<string, any> = {};
-  for (const [key, value] of Object.entries(obj)) {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     sanitized[key] = sanitizeObject(value);
   }
   return sanitized;

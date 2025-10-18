@@ -70,13 +70,13 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
       instrumentations: [
         // HTTP instrumentation for all HTTP requests
         new HttpInstrumentation({
-          requestHook: (span, request: any) => {
+          requestHook: (span, request: { headers: Record<string, string> }) => {
             span.setAttribute('http.request_id', request.headers['x-request-id']);
           },
         }),
         // Express instrumentation for route tracing
         new ExpressInstrumentation({
-          requestHook: (span, info: any) => {
+          requestHook: (span, info: { request: { method: string }; layerType: string }) => {
             span.updateName(`${info.request.method} ${info.layerType}`);
           },
         }),
@@ -109,7 +109,7 @@ function initializeTracing(serviceName: string = 'bore-backend'): NodeTracerProv
 async function traceFunction<T>(
   name: string, 
   fn: (span?: Span) => Promise<T>, 
-  attributes: Record<string, any> = {}
+  attributes: Record<string, unknown> = {}
 ): Promise<T> {
   try {
     const tracer = trace.getTracer('bore-backend');

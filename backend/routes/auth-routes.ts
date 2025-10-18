@@ -49,7 +49,7 @@ router.post('/signup', authLimiter, validate(schemas.signup), async (req: Reques
     const planExpires = new Date(Date.now() + config.plans.trial.duration);
     
     // Use transaction to ensure atomic user creation and plan assignment
-    const user = await db.transaction(async (client: any) => {
+    const user = await db.transaction(async (client: import('pg').PoolClient) => {
       // Create user
       const result = await client.query(
         'INSERT INTO users (id, email, password_hash, name) VALUES ($1, $2, $3, $4) RETURNING *',
@@ -65,9 +65,9 @@ router.post('/signup', authLimiter, validate(schemas.signup), async (req: Reques
       
       return { ...newUser, plan: 'trial', plan_expires: planExpires };
     });
-    
+
     // Generate access token and refresh token
-    const token = generateToken(user as any);
+    const token = generateToken(user as { id: string; email: string; plan: string });
     const { token: refreshToken, expiresAt } = await createRefreshToken(
       user.id,
       req.get('user-agent') || 'unknown',
@@ -115,7 +115,7 @@ router.post('/login', authLimiter, validate(schemas.login), async (req: Request,
     }
     
     // Generate access token and refresh token
-    const token = generateToken(user as any);
+    const token = generateToken(user as { id: string; email: string; plan: string });
     const { token: refreshToken, expiresAt } = await createRefreshToken(
       user.id,
       req.get('user-agent') || 'unknown',
@@ -239,7 +239,7 @@ router.post('/refresh', authLimiter, async (req: Request, res: Response): Promis
     await revokeRefreshToken(refreshToken);
     
     // Generate new tokens
-    const newAccessToken = generateToken(user as any);
+    const newAccessToken = generateToken(user as { id: string; email: string; plan: string });
     const { token: newRefreshToken, expiresAt } = await createRefreshToken(
       user.id,
       req.get('user-agent') || 'unknown',

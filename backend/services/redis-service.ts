@@ -7,7 +7,13 @@
 import config from '../config';
 import { logger } from '../utils/logger';
 
-let redis: any;
+let redis: {
+  createClient: (options: { socket: { host: string; port: number; reconnectStrategy: (retries: number) => number | Error } }) => {
+    on: (event: string, callback: (err?: Error) => void) => void;
+    connect: () => Promise<void>;
+    quit: () => Promise<void>;
+  };
+} | null;
 
 try {
   redis = require('redis');
@@ -16,7 +22,17 @@ try {
   redis = null;
 }
 
-type RedisClient = any;
+type RedisClient = {
+  setEx: (key: string, ttl: number, value: string) => Promise<void>;
+  get: (key: string) => Promise<string | null>;
+  del: (key: string) => Promise<number>;
+  exists: (key: string) => Promise<number>;
+  ping: () => Promise<string>;
+  scan: (cursor: number, options: { MATCH: string; COUNT: number }) => Promise<{ cursor: number; keys: string[] }>;
+  on: (event: string, callback: (err?: Error) => void) => void;
+  connect: () => Promise<void>;
+  quit: () => Promise<void>;
+};
 
 let redisClient: RedisClient | null = null;
 let isConnected = false;
@@ -214,7 +230,7 @@ export const heartbeats = {
  * Server data interface
  */
 interface ServerData {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

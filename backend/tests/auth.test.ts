@@ -34,7 +34,7 @@ jest.mock('../middleware/refresh-token', () => ({
 // Mock auth middleware
 jest.mock('../auth-middleware', () => ({
   generateToken: jest.fn().mockReturnValue('mock-jwt-token'),
-  authenticateJWT: jest.fn((req: any, _res: any, next: any) => {
+  authenticateJWT: jest.fn((req: Record<string, unknown>, _res: unknown, next: () => void) => {
     req.user = { user_id: 'user_123', email: 'test@example.com' };
     next();
   })
@@ -80,7 +80,7 @@ describe('Auth Routes', () => {
       };
 
       db.getUserByEmail.mockResolvedValue(null); // User doesn't exist
-      db.transaction.mockImplementation(async (callback: any) => {
+      db.transaction.mockImplementation(async (callback: (client: { query: jest.Mock }) => Promise<unknown>) => {
         const mockClient = {
           query: jest.fn()
             .mockResolvedValueOnce({ rows: [mockUser] }) // CREATE

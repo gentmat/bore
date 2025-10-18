@@ -3,12 +3,11 @@
  * Provides consistent error formatting across all API endpoints
  */
 
-/// <reference path="../types/express.d.ts" />
 import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 
 interface ErrorDetails {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ErrorResponse {
@@ -164,7 +163,7 @@ const ErrorResponses = {
  * Global error handler middleware
  * Place this at the end of all routes
  */
-function globalErrorHandler(err: any, req: Request, res: Response, _next: NextFunction): Response {
+function globalErrorHandler(err: Error & { statusCode?: number; errorCode?: string; details?: ErrorDetails; name?: string }, req: Request, res: Response, _next: NextFunction): Response {
   // Log error for debugging
   logger.error('Global Error Handler', err, {
     requestId: req.id,

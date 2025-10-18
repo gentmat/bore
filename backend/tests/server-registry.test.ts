@@ -67,7 +67,7 @@ describe('Server Registry', () => {
 
     it('should store in Redis when enabled', async () => {
       config.redis.enabled = true;
-      (redisService as any).client = {
+      (redisService as { client: { setex: jest.Mock } }).client = {
         setex: jest.fn().mockResolvedValue('OK')
       };
       (mockDb.query as jest.Mock).mockResolvedValue({});
@@ -77,7 +77,7 @@ describe('Server Registry', () => {
         host: '192.168.1.100'
       });
 
-      expect((redisService as any).client.setex).toHaveBeenCalled();
+      expect((redisService as { client: { setex: jest.Mock } }).client.setex).toHaveBeenCalled();
     });
   });
 
@@ -217,7 +217,7 @@ describe('Server Registry', () => {
 
     it('should update Redis when enabled', async () => {
       config.redis.enabled = true;
-      (redisService as any).client = {
+      (redisService as { client: { get: jest.Mock; setex: jest.Mock } }).client = {
         get: jest.fn().mockResolvedValue(JSON.stringify({
           id: 'server_1',
           host: '192.168.1.100'
@@ -227,7 +227,7 @@ describe('Server Registry', () => {
 
       await updateServerLoad('server_1', 50, 300);
 
-      expect((redisService as any).client.setex).toHaveBeenCalled();
+      expect((redisService as { client: { setex: jest.Mock } }).client.setex).toHaveBeenCalled();
     });
   });
 

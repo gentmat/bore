@@ -32,7 +32,7 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
   const { api_key } = req.body;
   
   try {
-    const tokenInfo: any = await db.getTunnelToken(api_key);
+    const tokenInfo: { expires_at: Date; instance_id: string; user_id: string } | undefined = await db.getTunnelToken(api_key);
     
     if (!tokenInfo) {
       res.json({
@@ -114,7 +114,7 @@ router.post('/validate-key', requireInternalApiKey, validate(schemas.validateKey
 router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(schemas.tunnelConnected), async (req: Request, res: Response): Promise<void> => {
   try {
     const instanceId = req.params.id as string;
-    const instance: any = await db.getInstanceById(instanceId);
+    const instance: { id: string; user_id: string; userId: string; server_host: string | null; serverHost: string | null; current_tunnel_token: string | null; currentTunnelToken: string | null } | undefined = await db.getInstanceById(instanceId);
     
     if (!instance) {
       ErrorResponses.notFound(res, 'Instance', req.id);
@@ -123,7 +123,7 @@ router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(s
     
     const { remotePort, publicUrl } = req.body || {};
     
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       tunnel_connected: true,
       status: 'active'
     };
@@ -164,7 +164,7 @@ router.post('/instances/:id/tunnel-connected', requireInternalApiKey, validate(s
 router.post('/instances/:id/tunnel-disconnected', requireInternalApiKey, async (req: Request, res: Response): Promise<void> => {
   try {
     const instanceId = req.params.id as string;
-    const instance: any = await db.getInstanceById(instanceId);
+    const instance: { id: string; user_id: string; userId: string; server_host: string | null; serverHost: string | null; current_tunnel_token: string | null; currentTunnelToken: string | null } | undefined = await db.getInstanceById(instanceId);
     
     if (!instance) {
       ErrorResponses.notFound(res, 'Instance', req.id);

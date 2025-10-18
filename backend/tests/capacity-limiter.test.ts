@@ -23,7 +23,7 @@ const mockGetFleetStats = getFleetStats as jest.MockedFunction<typeof getFleetSt
 
 interface RequestWithUser extends Request {
   user?: { user_id: string; email: string; plan: string };
-  capacityInfo?: any;
+  capacityInfo?: unknown;
 }
 
 describe('Capacity Limiter', () => {

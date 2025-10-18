@@ -32,6 +32,7 @@ const getDatabaseConfig = () => {
 
   // In CI, ALWAYS use explicit environment variables and completely ignore DATABASE_URL
   if (isCI) {
+    // eslint-disable-next-line no-console
     console.log('🔧 CI Environment: Using explicit DB_* variables, ignoring DATABASE_URL');
     const config = {
       host: process.env.DB_HOST || 'localhost',
@@ -40,12 +41,14 @@ const getDatabaseConfig = () => {
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
     };
+    // eslint-disable-next-line no-console
     console.log('🔧 CI DB Config:', { ...config, password: '***' });
     return config;
   }
 
   // In non-CI, use DATABASE_URL if available
   if (databaseUrl) {
+    // eslint-disable-next-line no-console
     console.log('🔧 Non-CI Environment: Using DATABASE_URL');
     // Parse DATABASE_URL: postgresql://user:password@host:port/database
     const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
@@ -61,6 +64,7 @@ const getDatabaseConfig = () => {
   }
 
   // Fallback to individual environment variables
+  // eslint-disable-next-line no-console
   console.log('🔧 Fallback: Using individual DB_* variables');
   return {
     host: process.env.DB_HOST || 'localhost',

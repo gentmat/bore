@@ -28,12 +28,12 @@ function httpLoggerMiddleware(req: Request, res: Response, next: NextFunction): 
   const originalJson = res.json.bind(res);
   const originalSend = res.send.bind(res);
   
-  res.json = function(body: any) {
+  res.json = function(body: unknown) {
     res.locals.responseBody = body;
     return originalJson(body);
   };
-  
-  res.send = function(body: any) {
+
+  res.send = function(body: unknown) {
     res.locals.responseBody = body;
     return originalSend(body);
   };

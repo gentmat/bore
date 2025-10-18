@@ -93,7 +93,7 @@ function incrementCounter(metricName: keyof Metrics, value: number = 1): void {
  */
 function setGauge(metricName: keyof Metrics, value: number): void {
   if (metrics[metricName] !== undefined) {
-    metrics[metricName] = value as any;
+    (metrics[metricName] as number) = value;
   }
 }
 

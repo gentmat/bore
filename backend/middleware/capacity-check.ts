@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { createLogger } from '../utils/logger';
 
 interface CapacityConfig {
   maxTunnelsByPlan: {
@@ -40,6 +41,8 @@ const CAPACITY_CONFIG: CapacityConfig = {
   totalSystemCapacity: 100,
   reservedCapacityPercent: 20
 };
+
+const logger = createLogger('capacity-check');
 
 /**
  * Check if user can create more tunnels (in-memory version)
@@ -90,7 +93,7 @@ function checkUserQuota(req: Request, res: Response, next: NextFunction): Respon
     
     next();
   } catch (error) {
-    console.error('Capacity check error:', error);
+    logger.error('Capacity check error', error);
     // Fail open - allow request if check fails
     next();
   }
@@ -123,7 +126,7 @@ function checkSystemCapacity(req: Request, res: Response, next: NextFunction): R
     
     next();
   } catch (error) {
-    console.error('System capacity check error:', error);
+    logger.error('System capacity check error', error);
     next();
   }
 }

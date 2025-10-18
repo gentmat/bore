@@ -151,7 +151,7 @@ describe('globalErrorHandler', () => {
   });
 
   it('should handle JWT errors', () => {
-    const error: any = new Error('jwt malformed');
+    const error: unknown = new Error('jwt malformed');
     error.name = 'JsonWebTokenError';
     
     globalErrorHandler(error, mockReq as Request, mockRes as Response, mockNext);

@@ -163,12 +163,12 @@ declare namespace Bore {
   interface ApiError {
     error: string;
     message: string;
-    details?: any;
+    details?: unknown;
     requestId?: string;
     timestamp: string;
   }
 
-  interface SuccessResponse<T = any> {
+  interface SuccessResponse<T = unknown> {
     success: boolean;
     data?: T;
     message?: string;
@@ -216,7 +216,7 @@ declare namespace Bore {
     connectionTimeoutMillis: number;
   }
 
-  interface QueryResult<T = any> {
+  interface QueryResult<T = unknown> {
     rows: T[];
     rowCount: number;
     command: string;
