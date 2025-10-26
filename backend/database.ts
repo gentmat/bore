@@ -18,6 +18,7 @@ interface UserRecord extends Record<string, unknown> {
   name: string;
   plan: string;
   isAdmin: boolean;
+  isBanned: boolean;
   planExpires: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -145,6 +146,29 @@ interface Database {
   deleteTunnelToken(token: string): Promise<void>;
   saveAlert(instanceId: string, alertType: string, message: string): Promise<void>;
   getAlertHistory(instanceId: string, limit?: number): Promise<AlertRecord[]>;
+  // Admin-only methods
+  getAllUsers(): Promise<UserRecord[]>;
+  getSystemStats(): Promise<{
+    totalUsers: number;
+    totalInstances: number;
+    activeInstances: number;
+    totalBandwidthGb: number;
+    planDistribution: { plan: string; count: number }[];
+  }>;
+  banUser(userId: string): Promise<void>;
+  unbanUser(userId: string): Promise<void>;
+  forceDisconnectInstance(instanceId: string): Promise<void>;
+  logAdminAction(params: {
+    adminId: string;
+    adminEmail: string;
+    action: string;
+    targetType?: string;
+    targetId?: string;
+    details?: Record<string, unknown>;
+    ipAddress?: string;
+  }): Promise<void>;
+  getAuditLogs(limit?: number): Promise<unknown[]>;
+  getRecentErrors(limit?: number): Promise<unknown[]>;
 }
 
 const pool = new Pool({
@@ -195,6 +219,7 @@ async function initializeDatabase(): Promise<void> {
         name VARCHAR(255) NOT NULL,
         plan VARCHAR(50) DEFAULT 'trial',
         is_admin BOOLEAN DEFAULT FALSE,
+        is_banned BOOLEAN DEFAULT FALSE,
         plan_expires TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -319,6 +344,23 @@ async function initializeDatabase(): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS idx_user_token ON refresh_tokens(user_id, revoked, expires_at);
       CREATE INDEX IF NOT EXISTS idx_token_lookup ON refresh_tokens(token, revoked, expires_at)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        admin_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        admin_email VARCHAR(255),
+        action VARCHAR(100) NOT NULL,
+        target_type VARCHAR(50),
+        target_id VARCHAR(50),
+        details JSONB,
+        ip_address VARCHAR(45),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_admin ON audit_logs(admin_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_logs(target_type, target_id, created_at DESC)
     `);
 
     await client.query('COMMIT');
@@ -536,7 +578,106 @@ const db: Database = {
     );
 
     return mapRows<AlertRecord>(result.rows);
-  }
+  },
+
+  // Admin-only methods
+  async getAllUsers(): Promise<UserRecord[]> {
+    const result = await pool.query<PlainObject>(
+      'SELECT * FROM users ORDER BY created_at DESC'
+    );
+    return mapRows<UserRecord>(result.rows);
+  },
+
+  async getSystemStats(): Promise<{
+    totalUsers: number;
+    totalInstances: number;
+    activeInstances: number;
+    totalBandwidthGb: number;
+    planDistribution: { plan: string; count: number }[];
+  }> {
+    const [usersResult, instancesResult, activeResult, plansResult] = await Promise.all([
+      pool.query<{ count: string }>('SELECT COUNT(*) as count FROM users'),
+      pool.query<{ count: string }>('SELECT COUNT(*) as count FROM instances'),
+      pool.query<{ count: string }>('SELECT COUNT(*) as count FROM instances WHERE status IN (\'active\', \'online\')'),
+      pool.query<{ plan: string; count: string }>('SELECT plan, COUNT(*) as count FROM users GROUP BY plan'),
+    ]);
+
+    return {
+      totalUsers: parseInt(usersResult.rows[0]?.count || '0'),
+      totalInstances: parseInt(instancesResult.rows[0]?.count || '0'),
+      activeInstances: parseInt(activeResult.rows[0]?.count || '0'),
+      totalBandwidthGb: 0, // TODO: Implement bandwidth tracking
+      planDistribution: plansResult.rows.map((row: { plan: string; count: string }) => ({
+        plan: row.plan,
+        count: parseInt(row.count)
+      })),
+    };
+  },
+
+  // Admin Actions
+  async banUser(userId: string): Promise<void> {
+    await pool.query(
+      'UPDATE users SET is_banned = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [userId]
+    );
+  },
+
+  async unbanUser(userId: string): Promise<void> {
+    await pool.query(
+      'UPDATE users SET is_banned = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [userId]
+    );
+  },
+
+  async forceDisconnectInstance(instanceId: string): Promise<void> {
+    await pool.query(
+      `UPDATE instances 
+       SET status = 'inactive', 
+           tunnel_connected = FALSE, 
+           status_reason = 'Force disconnected by admin',
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $1`,
+      [instanceId]
+    );
+  },
+
+  async logAdminAction(params: {
+    adminId: string;
+    adminEmail: string;
+    action: string;
+    targetType?: string;
+    targetId?: string;
+    details?: Record<string, unknown>;
+    ipAddress?: string;
+  }): Promise<void> {
+    await pool.query(
+      `INSERT INTO audit_logs (admin_id, admin_email, action, target_type, target_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        params.adminId,
+        params.adminEmail,
+        params.action,
+        params.targetType || null,
+        params.targetId || null,
+        params.details ? JSON.stringify(params.details) : null,
+        params.ipAddress || null,
+      ]
+    );
+  },
+
+  async getAuditLogs(limit: number = 100): Promise<unknown[]> {
+    const result = await pool.query(
+      `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    return formatDbRows(result.rows);
+  },
+
+  async getRecentErrors(_limit: number = 50): Promise<unknown[]> {
+    // This would require a logs table - placeholder for now
+    // In production, you'd query from a centralized logging system
+    return [];
+  },
 };
 
 export {

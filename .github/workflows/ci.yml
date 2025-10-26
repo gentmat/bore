@@ -120,6 +120,10 @@ jobs:
         run: npm run build
         continue-on-error: true
 
+      - name: Build Frontend
+        working-directory: backend
+        run: npm run build:frontend
+
       - name: Run migrations
         working-directory: backend
         env:
@@ -265,10 +269,17 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Build frontend
+        working-directory: backend
+        run: npm run build:frontend
+
       - name: Build Rust components
         run: |
           cargo build --release -p bore-server
           cargo build --release -p bore-client
+
+      - name: Build backend Docker image
+        run: docker-compose -f backend/docker-compose.yml build backend
 
       - name: Setup database
         working-directory: backend
@@ -329,6 +340,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build frontend assets
+        working-directory: backend
+        run: npm run build:frontend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

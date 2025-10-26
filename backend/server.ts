@@ -43,6 +43,7 @@ import {
   instanceHeartbeats,
 } from "./routes/instance-routes";
 import internalRoutes from "./routes/internal-routes";
+import adminRoutes from "./routes/admin-routes";
 import { swaggerUi, swaggerDocument, swaggerOptions } from "./swagger";
 
 const app: Application = express();
@@ -186,8 +187,7 @@ function broadcastMiddleware(
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/instances", broadcastMiddleware, instanceRoutes);
 app.use("/api/v1/user/instances", broadcastMiddleware, instanceRoutes); // Alias
-// Note: admin routes not yet migrated to TypeScript
-// app.use('/api/v1/admin', adminRoutes);
+app.use("/api/v1/admin", adminRoutes); // Admin owner dashboard routes
 app.use("/api/v1/internal", broadcastMiddleware, internalRoutes);
 
 // Backward compatibility - redirect old API paths to v1
@@ -370,7 +370,7 @@ app.get("/viewer", (_req: Request, res: Response) => {
 });
 
 app.get("/", (_req: Request, res: Response) => {
-  res.redirect("/signup");
+  res.redirect("/login");
 });
 
 // Error handlers (must be last!)

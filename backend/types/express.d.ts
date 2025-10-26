@@ -53,4 +53,26 @@ export type AuthRequest = Express.Request & {
   id: string;
 };
 
+/**
+ * Type alias for admin-authenticated requests
+ */
+export type AdminRequest = Express.Request & {
+  user: {
+    user_id: string;
+    email: string;
+    plan: string;
+    is_admin?: boolean;
+  };
+  adminUser: {
+    id: string;
+    email: string;
+    name: string;
+    plan: string;
+    is_admin: boolean;
+    created_at: Date;
+    updated_at: Date;
+  };
+  id: string;
+};
+
 export {};

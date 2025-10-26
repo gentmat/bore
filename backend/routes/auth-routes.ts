@@ -145,6 +145,7 @@ router.post(
           name: user.name,
           plan: user.plan,
           plan_expires: user.planExpires,
+          is_admin: user.isAdmin,
         },
       });
     } catch (error) {

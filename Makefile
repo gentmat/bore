@@ -102,11 +102,6 @@ test-backend:
 	@echo "📦 Running backend tests..."
 	cd backend && npm test
 
-integration-tests:
-	@echo "🔗 Running integration tests..."
-	@echo "⚠️  Requires running backend and bore-server"
-	cargo test --workspace --test '*' -- --ignored
-
 coverage:
 	@echo "📊 Generating test coverage..."
 	cargo tarpaulin --out Html --output-dir coverage
@@ -133,16 +128,18 @@ clean:
 
 # Docker
 docker-build:
+	@echo "🔨 Building frontend assets..."
+	cd backend && npm run build:frontend
 	@echo "🐳 Building Docker images..."
-	cd backend && docker-compose build
+	cd backend && sudo docker-compose build
 
-docker-up:
+docker-up: docker-build
 	@echo "🐳 Starting Docker services..."
-	cd backend && docker-compose up -d --build
+	cd backend && sudo docker-compose up -d
 
 docker-down:
 	@echo "🐳 Stopping Docker services..."
-	cd backend && docker-compose down
+	cd backend && sudo docker-compose --profile tunnel --profile monitoring down
 
 # Monitoring
 monitoring-setup:
@@ -151,15 +148,15 @@ monitoring-setup:
 
 monitoring-up:
 	@echo "📊 Starting monitoring services..."
-	cd backend && docker-compose --profile monitoring up -d
+	cd backend && sudo docker-compose --profile monitoring up -d
 
 monitoring-down:
 	@echo "📊 Stopping monitoring services..."
-	cd backend && docker-compose --profile monitoring down
+	cd backend && sudo docker-compose --profile monitoring down
 
 monitoring-logs:
 	@echo "📊 Showing monitoring logs..."
-	cd backend && docker-compose logs -f prometheus grafana
+	cd backend && sudo docker-compose logs -f prometheus grafana
 
 monitoring-status:
 	@echo "📊 Checking monitoring services..."
@@ -169,7 +166,7 @@ monitoring-status:
 
 docker-logs:
 	@echo "📋 Showing Docker logs..."
-	docker-compose logs -f
+	cd backend && sudo docker-compose logs -f
 
 # Development
 dev-backend:

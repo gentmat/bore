@@ -70,7 +70,7 @@ interface AdminRequest extends AuthenticatedRequest {
 /**
  * Middleware to verify JWT token
  */
-export function authenticateJWT(req: Request, res: Response, next: NextFunction): void {
+export async function authenticateJWT(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   
   if (!authHeader) {
@@ -93,10 +93,22 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    req.user = {
+    
+    // Check if user is banned
+    const user = await db.getUserById(decoded.user_id);
+    if (user?.isBanned) {
+      res.status(403).json({ 
+        error: 'forbidden', 
+        message: 'Your account has been suspended. Please contact support.' 
+      });
+      return;
+    }
+    
+    (req as AuthenticatedRequest).user = {
       user_id: decoded.user_id,
       email: decoded.email,
-      plan: decoded.plan || 'trial'
+      plan: decoded.plan || 'trial',
+      is_admin: decoded.is_admin
     };
     next();
   } catch (err) {

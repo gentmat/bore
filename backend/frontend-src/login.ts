@@ -6,7 +6,7 @@ document.getElementById('loginForm')!.addEventListener('submit', async (e: Event
     const email = (document.getElementById('email') as HTMLInputElement).value;
     const password = (document.getElementById('password') as HTMLInputElement).value;
     const errorMessage = document.getElementById('error-message')!;
-    const submitBtn = (e.target as HTMLFormElement).querySelector('button[type="submit"]')!;
+    const submitBtn = (e.target as HTMLFormElement).querySelector('button[type="submit"]') as HTMLButtonElement;
     const btnText = submitBtn.querySelector('.btn-text') as HTMLElement;
     const btnLoader = submitBtn.querySelector('.btn-loader') as HTMLElement;
     
@@ -34,13 +34,17 @@ document.getElementById('loginForm')!.addEventListener('submit', async (e: Event
             throw new Error(data.message || 'Login failed');
         }
         
+        const userPayload = data?.user || {};
+        const isAdmin = !!userPayload.is_admin;
+
         // Store token and user info
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user_id', data.user_id);
-        localStorage.setItem('user_name', data.name || email);
+        localStorage.setItem('user_id', userPayload.id || '');
+        localStorage.setItem('user_name', userPayload.name || email);
+        localStorage.setItem('is_admin', isAdmin ? 'true' : 'false');
         
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
+        // Redirect based on role
+        window.location.href = isAdmin ? '/admin.html' : '/dashboard';
         
     } catch (error) {
         errorMessage.textContent = (error as Error).message || 'An error occurred. Please try again.';
@@ -55,5 +59,6 @@ document.getElementById('loginForm')!.addEventListener('submit', async (e: Event
 
 // Check if already logged in
 if (localStorage.getItem('token')) {
-    window.location.href = '/dashboard';
+    const isAdmin = localStorage.getItem('is_admin') === 'true';
+    window.location.href = isAdmin ? '/admin.html' : '/dashboard';
 }

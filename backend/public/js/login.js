@@ -27,10 +27,13 @@
       if (!response.ok) {
         throw new Error(data.message || "Login failed");
       }
+      const userPayload = data?.user || {};
+      const isAdmin = !!userPayload.is_admin;
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user_id", data.user_id);
-      localStorage.setItem("user_name", data.name || email);
-      window.location.href = "/dashboard";
+      localStorage.setItem("user_id", userPayload.id || "");
+      localStorage.setItem("user_name", userPayload.name || email);
+      localStorage.setItem("is_admin", isAdmin ? "true" : "false");
+      window.location.href = isAdmin ? "/admin.html" : "/dashboard";
     } catch (error) {
       errorMessage.textContent = error.message || "An error occurred. Please try again.";
       errorMessage.classList.add("show");
@@ -40,7 +43,8 @@
     }
   });
   if (localStorage.getItem("token")) {
-    window.location.href = "/dashboard";
+    const isAdmin = localStorage.getItem("is_admin") === "true";
+    window.location.href = isAdmin ? "/admin.html" : "/dashboard";
   }
 })();
 //# sourceMappingURL=login.js.map

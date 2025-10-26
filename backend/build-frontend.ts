@@ -13,7 +13,8 @@ const files = [
   'signup',
   'dashboard',
   'claim-trial',
-  'viewer'
+  'viewer',
+  'admin'
 ];
 
 async function build(): Promise<void> {
