@@ -26,10 +26,10 @@
     "type-check:watch": "tsc --noEmit --watch",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
-    "migrate": "node -r ts-node/register node_modules/.bin/node-pg-migrate -m migrations -c database.config.ts",
-    "migrate:up": "node -r ts-node/register node_modules/.bin/node-pg-migrate up -m migrations -c database.config.ts",
-    "migrate:down": "node -r ts-node/register node_modules/.bin/node-pg-migrate down -m migrations -c database.config.ts",
-    "migrate:create": "node -r ts-node/register node_modules/.bin/node-pg-migrate create -m migrations -c database.config.ts"
+    "migrate": "node -r ts-node/register node_modules/.bin/node-pg-migrate -m migrations -f database.config.ts",
+    "migrate:up": "node -r ts-node/register node_modules/.bin/node-pg-migrate up -m migrations -f database.config.ts",
+    "migrate:down": "node -r ts-node/register node_modules/.bin/node-pg-migrate down -m migrations -f database.config.ts",
+    "migrate:create": "node -r ts-node/register node_modules/.bin/node-pg-migrate create -m migrations -f database.config.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.7.0",

@@ -3,26 +3,21 @@
  * Configuration for database migrations
  */
 
+import dotenv from 'dotenv';
+
 // Only load dotenv in non-CI environments
 if (!process.env.CI) {
-  import('dotenv').then(dotenv => {
-    dotenv.config();
-  });
+  dotenv.config();
 }
 
-interface MigrationConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  dir: string;
-  migrationsTable: string;
-  checkOrder: boolean;
-  ignorePattern: string;
-  'migration-file-language': string;
-  timestamp: boolean;
-}
+
+const stringEnv = (value: unknown, fallback: string): string => {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  return fallback;
+};
 
 // Parse DATABASE_URL if available, otherwise use individual variables
 // In CI environments, completely ignore DATABASE_URL and only use explicit variables
@@ -35,11 +30,11 @@ const getDatabaseConfig = () => {
     // eslint-disable-next-line no-console
     console.log('🔧 CI Environment: Using explicit DB_* variables, ignoring DATABASE_URL');
     const config = {
-      host: process.env.DB_HOST || 'localhost',
+      host: stringEnv(process.env.DB_HOST, 'localhost'),
       port: parseInt(process.env.DB_PORT || '5432', 10),
-      database: process.env.DB_NAME || 'bore_db',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
+      database: stringEnv(process.env.DB_NAME, 'bore_db'),
+      user: stringEnv(process.env.DB_USER, 'postgres'),
+      password: stringEnv(process.env.DB_PASSWORD, 'postgres'),
     };
     // eslint-disable-next-line no-console
     console.log('🔧 CI DB Config:', { ...config, password: '***' });
@@ -54,11 +49,11 @@ const getDatabaseConfig = () => {
     const match = databaseUrl.match(/^postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/);
     if (match) {
       return {
-        host: match[3] || 'localhost',
+        host: stringEnv(match[3], 'localhost'),
         port: parseInt(match[4] || '5432', 10),
-        database: match[5] || 'bore_db',
-        user: match[1] || 'postgres',
-        password: match[2] || 'postgres',
+        database: stringEnv(match[5], 'bore_db'),
+        user: stringEnv(match[1], 'postgres'),
+        password: stringEnv(match[2], 'postgres'),
       };
     }
   }
@@ -67,17 +62,17 @@ const getDatabaseConfig = () => {
   // eslint-disable-next-line no-console
   console.log('🔧 Fallback: Using individual DB_* variables');
   return {
-    host: process.env.DB_HOST || 'localhost',
+    host: stringEnv(process.env.DB_HOST, 'localhost'),
     port: parseInt(process.env.DB_PORT || '5432', 10),
-    database: process.env.DB_NAME || 'bore_db',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
+    database: stringEnv(process.env.DB_NAME, 'bore_db'),
+    user: stringEnv(process.env.DB_USER, 'postgres'),
+    password: stringEnv(process.env.DB_PASSWORD, 'postgres'),
   };
 };
 
 const dbConfig = getDatabaseConfig();
 
-const migrationConfig: MigrationConfig = {
+const migrationConfig = {
   // Database connection settings
   host: dbConfig.host,
   port: dbConfig.port,
@@ -98,4 +93,4 @@ const migrationConfig: MigrationConfig = {
   timestamp: true,
 };
 
-export = migrationConfig;
+module.exports = migrationConfig;
