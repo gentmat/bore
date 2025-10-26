@@ -20,6 +20,7 @@ interface MockUser {
   name: string;
   plan: string;
   isAdmin: boolean;
+  isBanned: boolean;
   planExpires: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -151,6 +152,7 @@ describe("Capacity Limiter", () => {
         name: "Test User",
         plan: "pro",
         isAdmin: false,
+        isBanned: false,
         planExpires: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -179,6 +181,7 @@ describe("Capacity Limiter", () => {
         name: "Test User",
         plan: "trial",
         isAdmin: false,
+        isBanned: false,
         planExpires: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -208,6 +211,7 @@ describe("Capacity Limiter", () => {
         name: "Test User",
         plan: "enterprise",
         isAdmin: false,
+        isBanned: false,
         planExpires: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -228,7 +232,7 @@ describe("Capacity Limiter", () => {
     });
 
     it("should handle user not found", async () => {
-      mockDb.getUserById.mockResolvedValue(null as unknown as MockUser);
+      mockDb.getUserById.mockResolvedValue(undefined);
 
       const result = await checkUserQuota("user_nonexistent");
 
@@ -284,6 +288,7 @@ describe("Capacity Limiter", () => {
         name: "Test User",
         plan: "pro",
         isAdmin: false,
+        isBanned: false,
         planExpires: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -344,6 +349,7 @@ describe("Capacity Limiter", () => {
         name: "Test User",
         plan: "trial",
         isAdmin: false,
+        isBanned: false,
         planExpires: null,
         createdAt: new Date(),
         updatedAt: new Date(),
