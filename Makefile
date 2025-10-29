@@ -2,6 +2,8 @@
 
 .PHONY: help install audit test lint format clean docker-build integration-tests
 
+DOCKER_COMPOSE ?= docker compose
+
 help:
 	@echo "Bore Development & Security Commands"
 	@echo "===================================="
@@ -45,8 +47,13 @@ help:
 install:
 	@echo "📦 Installing dependencies..."
 	cargo build
-	cd backend && npm install
+	$(MAKE) backend/node_modules/.stamp
 	@echo "✅ Installation complete!"
+
+backend/node_modules/.stamp: backend/package.json backend/package-lock.json
+	@echo "📦 Installing backend dependencies..."
+	cd backend && npm install
+	@touch $@
 
 install-tools:
 	@echo "🔧 Installing development tools..."
@@ -115,7 +122,7 @@ build-rust:
 	@echo "🦀 Building Rust workspace..."
 	cargo build --release
 
-build-backend:
+build-backend: backend/node_modules/.stamp
 	@echo "📦 Building backend..."
 	cd backend && npm run build
 
@@ -124,22 +131,23 @@ clean:
 	@echo "🧹 Cleaning build artifacts..."
 	cargo clean
 	cd backend && rm -rf node_modules dist
+	rm -f backend/node_modules/.stamp
 	@echo "✅ Clean complete!"
 
 # Docker
-docker-build:
+docker-build: backend/node_modules/.stamp
 	@echo "🔨 Building frontend assets..."
 	cd backend && npm run build:frontend
 	@echo "🐳 Building Docker images..."
-	cd backend && sudo docker-compose build
+	cd backend && sudo $(DOCKER_COMPOSE) build
 
 docker-up: docker-build
 	@echo "🐳 Starting Docker services..."
-	cd backend && sudo docker-compose up -d
+	cd backend && sudo $(DOCKER_COMPOSE) up -d
 
 docker-down:
 	@echo "🐳 Stopping Docker services..."
-	cd backend && sudo docker-compose --profile tunnel --profile monitoring down
+	cd backend && sudo $(DOCKER_COMPOSE) --profile tunnel --profile monitoring down
 
 # Monitoring
 monitoring-setup:
@@ -148,15 +156,15 @@ monitoring-setup:
 
 monitoring-up:
 	@echo "📊 Starting monitoring services..."
-	cd backend && sudo docker-compose --profile monitoring up -d
+	cd backend && sudo $(DOCKER_COMPOSE) --profile monitoring up -d
 
 monitoring-down:
 	@echo "📊 Stopping monitoring services..."
-	cd backend && sudo docker-compose --profile monitoring down
+	cd backend && sudo $(DOCKER_COMPOSE) --profile monitoring down
 
 monitoring-logs:
 	@echo "📊 Showing monitoring logs..."
-	cd backend && sudo docker-compose logs -f prometheus grafana
+	cd backend && sudo $(DOCKER_COMPOSE) logs -f prometheus grafana
 
 monitoring-status:
 	@echo "📊 Checking monitoring services..."
@@ -166,7 +174,7 @@ monitoring-status:
 
 docker-logs:
 	@echo "📋 Showing Docker logs..."
-	cd backend && sudo docker-compose logs -f
+	cd backend && sudo $(DOCKER_COMPOSE) logs -f
 
 # Development
 dev-backend:
