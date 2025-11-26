@@ -543,8 +543,10 @@ fn get_memory_usage() -> u64 {
     sys.refresh_processes();
     
     // Get current process memory usage
-    if let Some(process) = sys.process(sysinfo::get_current_pid().ok()?) {
-        return process.memory() / 1024 / 1024; // Convert bytes to MB
+    if let Ok(pid) = sysinfo::get_current_pid() {
+        if let Some(process) = sys.process(pid) {
+            return process.memory() / 1024 / 1024; // Convert bytes to MB
+        }
     }
     
     0

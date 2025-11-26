@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use eventsource_client as es;
-use eventsource_client::Client;
+use eventsource_client::{Client, ClientBuilder};
 use futures::StreamExt;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
@@ -31,7 +31,7 @@ pub async fn start_status_listener(
 
     let handle = tokio::spawn(async move {
         loop {
-            let client = match Client::for_url(&url)
+            let client = match ClientBuilder::for_url(&url)
                 .and_then(|c| c.header("Authorization", &format!("Bearer {}", token)))
                 .map(|c| c.build())
             {

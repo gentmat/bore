@@ -45,6 +45,10 @@ pub async fn list_instances(
                 TunnelStatus::Starting => "starting",
                 TunnelStatus::Error => "error",
                 TunnelStatus::Inactive => "inactive",
+                TunnelStatus::Online => "online",
+                TunnelStatus::Degraded => "degraded",
+                TunnelStatus::Idle => "idle",
+                TunnelStatus::Offline => "offline",
             })
             .unwrap_or("inactive");
 
