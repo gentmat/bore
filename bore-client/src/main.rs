@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tokio::{signal, sync::oneshot};
 
-use bore_client::{api_client::ApiClient, auth::Credentials, client::Client};
+use bore_client::{api_client::ApiClient, auth::Credentials, client::Client, code_server};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about = "bore client - local proxy for TCP tunnels")]
@@ -186,6 +186,8 @@ async fn handle_login(api_endpoint: String) -> Result<()> {
     println!("✓ Successfully logged in!");
     println!("  User ID: {}", credentials.user_id);
 
+    code_server::warn_if_missing();
+
     Ok(())
 }
 
@@ -270,6 +272,8 @@ async fn handle_signup(api_endpoint: String) -> Result<()> {
     println!("✓ Account created and logged in!");
     println!("  User ID: {}", credentials.user_id);
 
+    code_server::warn_if_missing();
+
     Ok(())
 }
 
@@ -341,6 +345,7 @@ async fn handle_start(instance_name_or_id: String) -> Result<()> {
     println!("✓ Forwarding localhost:{}\n", connection_info.local_port);
     println!("  Instance ID: {}", connection_info.instance_id);
     println!("  Token TTL: {}s\n", connection_info.ttl);
+    code_server::start_for_current_dir(connection_info.local_port);
 
     // Start heartbeat task to report online status
     let instance_id = instance.id.clone();
