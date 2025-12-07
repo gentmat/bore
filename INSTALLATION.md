@@ -279,12 +279,17 @@ sudo cp target/release/bore /usr/local/bin/
 ### Usage
 
 ```bash
-bore local <LOCAL_PORT> --to <SERVER_HOST> --port <SERVER_PORT>
-```
+# Sign up (first time)
+bore signup --api-endpoint http://localhost:3000
 
-Example:
-```bash
-bore local 8080 --to your-server.com --port 7835
+# Or login with an existing account
+bore login --api-endpoint http://localhost:3000
+
+# List your tunnel instances
+bore list
+
+# Start a managed tunnel instance
+bore start <instance-name-or-id>
 ```
 
 ---

@@ -27,6 +27,27 @@ pub struct LoginResponse {
     pub user_id: String,
 }
 
+/// Signup request
+#[derive(Debug, Serialize)]
+pub struct SignupRequest {
+    pub name: String,
+    pub email: String,
+    pub password: String,
+}
+
+/// User payload returned from signup
+#[derive(Debug, Deserialize)]
+pub struct SignupUser {
+    pub id: String,
+}
+
+/// Signup response
+#[derive(Debug, Deserialize)]
+pub struct SignupResponse {
+    pub token: String,
+    pub user: SignupUser,
+}
+
 /// Tunnel instance information
 #[derive(Debug, Clone, Deserialize)]
 pub struct Instance {
@@ -102,6 +123,43 @@ impl ApiClient {
             status => {
                 let error_text = response.text().await.unwrap_or_default();
                 bail!("login failed with status {}: {}", status, error_text)
+            }
+        }
+    }
+
+    /// Sign up with name, email and password
+    pub async fn signup(
+        &mut self,
+        name: String,
+        email: String,
+        password: String,
+    ) -> Result<SignupResponse> {
+        let url = format!("{}/api/v1/auth/signup", self.base_url);
+        let request = SignupRequest { name, email, password };
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .context("failed to send signup request")?;
+
+        match response.status() {
+            StatusCode::CREATED => {
+                let signup_response: SignupResponse = response
+                    .json()
+                    .await
+                    .context("failed to parse signup response")?;
+                self.auth_token = Some(signup_response.token.clone());
+                Ok(signup_response)
+            }
+            StatusCode::CONFLICT => {
+                bail!("email already registered")
+            }
+            status => {
+                let error_text = response.text().await.unwrap_or_default();
+                bail!("signup failed with status {}: {}", status, error_text)
             }
         }
     }

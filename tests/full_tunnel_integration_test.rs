@@ -79,7 +79,7 @@ async fn setup_test_user(config: &mut TestConfig) -> Result<()> {
     let client = HttpClient::new();
 
     // Register user
-    let register_url = format!("{}/api/v1/auth/register", config.backend_url);
+    let register_url = format!("{}/api/v1/auth/signup", config.backend_url);
     let register_payload = json!({
         "email": config.test_user.email,
         "password": config.test_user.password,

@@ -19,8 +19,8 @@ info:
     - Deprecated versions include `X-API-Deprecation` headers with sunset dates
     
     **Legacy Support:**
-    - Unversioned endpoints (e.g., `/api/auth/*`) automatically redirect to `/api/v1/*` using HTTP 308
-    - Clients should explicitly use versioned endpoints in production
+    - Earlier versions supported automatic redirects from `/api/*` to `/api/v1/*`
+    - Redirects have been removed; clients **must** call `/api/v1/*` endpoints directly
     
     For detailed versioning documentation, see the [Development Guide](../../DEVELOPMENT.md#api-versioning-strategy).
   version: 1.0.0

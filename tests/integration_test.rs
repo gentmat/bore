@@ -57,7 +57,7 @@ async fn test_backend_health() -> Result<()> {
 async fn test_user_registration() -> Result<()> {
     ensure_backend_available().await?;
     let client = HttpClient::new();
-    let url = format!("{}/api/v1/auth/register", backend_url());
+    let url = format!("{}/api/v1/auth/signup", backend_url());
     
     let test_email = format!("test-{}@example.com", uuid::Uuid::new_v4());
     let payload = json!({
@@ -93,7 +93,7 @@ async fn test_user_login() -> Result<()> {
     let test_email = format!("login-test-{}@example.com", uuid::Uuid::new_v4());
     let password = "TestPassword123!";
     
-    let register_url = format!("{}/api/v1/auth/register", backend_url());
+    let register_url = format!("{}/api/v1/auth/signup", backend_url());
     let register_payload = json!({
         "email": test_email,
         "password": password,
@@ -149,7 +149,7 @@ async fn test_instance_creation() -> Result<()> {
     });
     
     client
-        .post(&format!("{}/api/v1/auth/register", base_url))
+        .post(&format!("{}/api/v1/auth/signup", base_url))
         .json(&register_payload)
         .send()
         .await?;
@@ -210,7 +210,7 @@ async fn test_api_key_validation() -> Result<()> {
     let password = "TestPassword123!";
     
     client
-        .post(&format!("{}/api/v1/auth/register", base_url))
+        .post(&format!("{}/api/v1/auth/signup", base_url))
         .json(&json!({
             "email": test_email,
             "password": password,

@@ -66,14 +66,9 @@ sudo cp target/release/bore /usr/local/bin/bore
 
 #### Using the Client
 
-**Basic tunnel usage:**
-```bash
-# Create a tunnel from local port 8080 to remote server
-bore local 8080 --to localhost --port 7835
-
-# Tunnel example: Make local web server accessible remotely
-bore local 8080 --to your-server.com --port 7835
-```
+For creating tunnels, use the managed bore-client flow described in the
+*How to use bore-client* section below (`bore signup`, `bore login`,
+`bore list`, `bore start`).
 
 ## Service Management Commands
 
@@ -108,45 +103,48 @@ sudo docker compose restart backend
 sudo docker compose up -d --build
 ```
 
-### View Logs
-```bash
-# All services
-./7_view_logs.sh
+## How to use bore-client
 
-# Specific service
-sudo docker compose logs -f backend
-sudo docker compose logs -f bore-server
+### Managed mode (recommended)
+
+Managed mode uses the Bore backend API and web dashboard.
+
+1. **Sign up (first time)**
+```bash
+bore signup --api-endpoint http://localhost:3000
+```
+If you set `BORE_API_ENDPOINT`, you can omit `--api-endpoint`.
+
+2. **Login (existing account)**
+```bash
+bore login --api-endpoint http://localhost:3000
+```
+If you set `BORE_API_ENDPOINT`, you can omit `--api-endpoint`.
+
+3. **List available tunnel instances**
+```bash
+bore list
+```
+This shows all instances associated with your account (created via the dashboard).
+
+4. **Start a tunnel for an instance**
+```bash
+bore start <instance-name-or-id>
+```
+The client will:
+- Connect to the Bore server
+- Start forwarding the configured local port
+- Keep the instance marked as active via heartbeats
+
+Keep this process running. Use `Ctrl+C` to stop the tunnel.
+
+5. **Logout (optional)**
+```bash
+bore logout
 ```
 
-## Troubleshooting
+### Environment variables
 
-### Services Won't Start
-1. Check Docker is running: `sudo systemctl status docker`
-2. Verify environment setup: `cd backend && cat .env`
-3. Check logs: `sudo docker compose logs`
+The CLI respects this environment variable:
 
-### Client Connection Issues
-1. Verify bore-server is running: `sudo docker compose ps bore-server`
-2. Check firewall settings: `./8_configure_firewall.sh`
-3. Test connectivity: `curl http://localhost:3000/health`
-
-### Port Conflicts
-1. Check what's using the port: `sudo netstat -tulpn | grep :3000`
-2. Modify `.env` file to change ports
-3. Restart services: `sudo docker compose up -d`
-
-## Quick Start Summary
-
-After installation, start everything with:
-```bash
-# Start backend and core services
-sudo docker compose --profile tunnel up -d
-
-# Verify everything is running
-./4_verify_installation.sh
-
-# Use the client
-bore local 8080 --to localhost --port 7835
-```
-
-Access the web interface at http://localhost:3000
+- `BORE_API_ENDPOINT`: Default API endpoint for `bore signup` and `bore login`

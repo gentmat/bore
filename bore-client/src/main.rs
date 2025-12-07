@@ -8,52 +8,20 @@ use bore_client::{api_client::ApiClient, auth::Credentials, client::Client};
 #[clap(author, version, about = "bore client - local proxy for TCP tunnels")]
 struct Args {
     #[clap(subcommand)]
-    command: Option<Command>,
-
-    /// The local port to expose.
-    #[clap(env = "BORE_LOCAL_PORT")]
-    local_port: Option<u16>,
-
-    /// The local host to expose.
-    #[clap(short = 'l', long, value_name = "HOST", default_value = "localhost")]
-    local_host: String,
-
-    /// Address of the remote server to expose local ports to.
-    #[clap(short, long, env = "BORE_SERVER")]
-    to: Option<String>,
-
-    /// Optional port on the remote server to select.
-    #[clap(short, long, default_value_t = 0)]
-    port: u16,
-
-    /// Optional secret for authentication.
-    #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
-    secret: Option<String>,
+    command: Command,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Starts a local proxy to the remote server (legacy command).
-    Local {
-        /// The local port to expose.
-        #[clap(env = "BORE_LOCAL_PORT")]
-        local_port: u16,
-
-        /// The local host to expose.
-        #[clap(short = 'l', long, value_name = "HOST", default_value = "localhost")]
-        local_host: String,
-
-        /// Address of the remote server to expose local ports to.
-        #[clap(short, long, env = "BORE_SERVER")]
-        to: String,
-
-        /// Optional port on the remote server to select.
-        #[clap(short, long, default_value_t = 0)]
-        port: u16,
-
-        /// Optional secret for authentication.
-        #[clap(short, long, env = "BORE_SECRET", hide_env_values = true)]
-        secret: Option<String>,
+    /// Sign up for a new bore account
+    Signup {
+        /// API endpoint URL (default: from environment or http://localhost:3000)
+        #[clap(
+            long,
+            env = "BORE_API_ENDPOINT",
+            default_value = "http://localhost:3000"
+        )]
+        api_endpoint: String,
     },
 
     /// Login to your bore account
@@ -86,40 +54,12 @@ enum Command {
 #[tokio::main]
 async fn run(args: Args) -> Result<()> {
     match args.command {
-        Some(Command::Login { api_endpoint }) => handle_login(api_endpoint).await,
-        Some(Command::Logout) => handle_logout(),
-        Some(Command::List) => handle_list().await,
-        Some(Command::Start { instance }) => handle_start(instance).await,
-        Some(Command::Stop) => handle_stop(),
-        Some(Command::Local {
-            local_host,
-            local_port,
-            to,
-            port,
-            secret,
-        }) => {
-            // Legacy mode: direct tunnel connection
-            let client = Client::new(&local_host, local_port, &to, port, secret.as_deref()).await?;
-            run_client_with_shutdown(client).await
-        }
-        None => {
-            // Direct arguments mode (backwards compatibility)
-            let local_port = args.local_port.ok_or_else(|| {
-                anyhow::anyhow!("local_port is required. Usage: bore <LOCAL_PORT> --to <SERVER>")
-            })?;
-            let to = args
-                .to
-                .ok_or_else(|| anyhow::anyhow!("--to <SERVER> is required"))?;
-            let client = Client::new(
-                &args.local_host,
-                local_port,
-                &to,
-                args.port,
-                args.secret.as_deref(),
-            )
-            .await?;
-            run_client_with_shutdown(client).await
-        }
+        Command::Signup { api_endpoint } => handle_signup(api_endpoint).await,
+        Command::Login { api_endpoint } => handle_login(api_endpoint).await,
+        Command::Logout => handle_logout(),
+        Command::List => handle_list().await,
+        Command::Start { instance } => handle_start(instance).await,
+        Command::Stop => handle_stop(),
     }
 }
 
@@ -224,6 +164,56 @@ async fn handle_login(api_endpoint: String) -> Result<()> {
     credentials.save()?;
 
     println!("✓ Successfully logged in!");
+    println!("  User ID: {}", credentials.user_id);
+
+    Ok(())
+}
+
+/// Handle signup command
+async fn handle_signup(api_endpoint: String) -> Result<()> {
+    use std::io::{self, Write};
+
+    println!("Sign up for a new bore account\n");
+
+    // Prompt for name
+    print!("Name: ");
+    io::stdout().flush()?;
+    let mut name = String::new();
+    io::stdin().read_line(&mut name)?;
+    let name = name.trim().to_string();
+
+    // Prompt for email
+    print!("Email: ");
+    io::stdout().flush()?;
+    let mut email = String::new();
+    io::stdin().read_line(&mut email)?;
+    let email = email.trim().to_string();
+
+    // Prompt for password (with confirmation)
+    let password =
+        rpassword::prompt_password("Password: ").context("failed to read password")?;
+    let confirm = rpassword::prompt_password("Confirm password: ")
+        .context("failed to read password confirmation")?;
+
+    if password != confirm {
+        return Err(anyhow::anyhow!("passwords do not match"));
+    }
+
+    println!("\nCreating account...");
+
+    // Signup via API
+    let mut api_client = ApiClient::new(api_endpoint.clone());
+    let signup_response = api_client.signup(name, email, password).await?;
+
+    // Save credentials
+    let credentials = Credentials::new(
+        api_endpoint,
+        signup_response.token,
+        signup_response.user.id,
+    );
+    credentials.save()?;
+
+    println!("✓ Account created and logged in!");
     println!("  User ID: {}", credentials.user_id);
 
     Ok(())

@@ -190,30 +190,6 @@ app.use("/api/v1/user/instances", broadcastMiddleware, instanceRoutes); // Alias
 app.use("/api/v1/admin", adminRoutes); // Admin owner dashboard routes
 app.use("/api/v1/internal", broadcastMiddleware, internalRoutes);
 
-// Backward compatibility - redirect old API paths to v1
-app.use("/api/auth*", (req: Request, res: Response) => {
-  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
-  return res.redirect(308, newPath); // 308 = Permanent Redirect (preserves method)
-});
-
-app.use(
-  "/api/instances*",
-  (req: Request, res: Response) => {
-    const newPath = req.originalUrl.replace("/api/", "/api/v1/");
-    return res.redirect(308, newPath);
-  },
-);
-
-app.use("/api/admin*", (req: Request, res: Response) => {
-  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
-  return res.redirect(308, newPath);
-});
-
-app.use("/api/internal*", (req: Request, res: Response) => {
-  const newPath = req.originalUrl.replace("/api/", "/api/v1/");
-  return res.redirect(308, newPath);
-});
-
 /**
  * SSE endpoint for real-time status updates (v1)
  */
