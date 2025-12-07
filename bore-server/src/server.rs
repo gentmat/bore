@@ -31,6 +31,10 @@ pub struct Server {
 
     /// Server ID for multi-server deployments.
     server_id: String,
+    /// Hostname/IP advertised to the backend for client connections.
+    advertise_host: String,
+    /// Optional location label for display / routing.
+    location: String,
 
     /// Concurrent map of IDs to incoming connections.
     conns: Arc<DashMap<Uuid, TcpStream>>,
@@ -56,6 +60,8 @@ impl Server {
         backend_url: Option<String>,
         backend_api_key: Option<String>,
         server_id: String,
+        advertise_host: String,
+        location: String,
     ) -> Self {
         assert!(!port_range.is_empty(), "must provide at least one port");
 
@@ -76,6 +82,8 @@ impl Server {
             auth: secret.map(Authenticator::new),
             backend: Arc::new(backend),
             server_id,
+            advertise_host,
+            location,
             bind_addr: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             bind_tunnels: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
         }
@@ -97,6 +105,11 @@ impl Server {
         let listener = TcpListener::bind((this.bind_addr, CONTROL_PORT)).await?;
         info!(addr = ?this.bind_addr, "server listening");
 
+        // Best effort registration with backend for load balancing visibility.
+        if let Err(err) = this.register_with_backend().await {
+            warn!(%err, "Failed to register bore-server with backend");
+        }
+
         loop {
             let (stream, addr) = listener.accept().await?;
             let this = Arc::clone(&this);
@@ -112,6 +125,19 @@ impl Server {
                 .instrument(info_span!("control", ?addr)),
             );
         }
+    }
+
+    async fn register_with_backend(&self) -> Result<()> {
+        self.backend
+            .register_server(&crate::backend::RegisterServerRequest {
+                id: Some(self.server_id.clone()),
+                host: self.advertise_host.clone(),
+                port: CONTROL_PORT,
+                location: Some(self.location.clone()),
+                max_bandwidth_mbps: None,
+                max_concurrent_tunnels: None,
+            })
+            .await
     }
 
     async fn create_listener(&self, port: u16) -> Result<TcpListener, &'static str> {

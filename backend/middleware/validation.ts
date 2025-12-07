@@ -118,6 +118,20 @@ const schemas = {
     remotePort: Joi.number().integer().min(1).max(65535).optional(),
     publicUrl: Joi.string().optional(),
   }),
+
+  registerServer: Joi.object({
+    id: Joi.string().optional(),
+    host: Joi.alternatives()
+      .try(
+        Joi.string().ip({ version: ["ipv4", "ipv6"], cidr: "forbidden" }),
+        Joi.string().hostname(),
+      )
+      .required(),
+    port: Joi.number().integer().min(1).max(65535).required(),
+    location: Joi.string().optional(),
+    maxBandwidthMbps: Joi.number().integer().min(1).optional(),
+    maxConcurrentTunnels: Joi.number().integer().min(1).optional(),
+  }),
 };
 
 /**

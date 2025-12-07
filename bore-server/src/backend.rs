@@ -11,6 +11,7 @@ use tracing::{debug, error, info, warn};
 
 const RETRY_ATTEMPTS: usize = 3;
 const RETRY_DELAY_MS: u64 = 300;
+const INTERNAL_API_PREFIX: &str = "api/v1/internal";
 
 /// Request to validate an API key with the backend.
 #[derive(Debug, Serialize)]
@@ -48,6 +49,18 @@ struct TunnelStartRequest {
 struct TunnelEndRequest {
     session_id: String,
     bytes_transferred: u64,
+}
+
+/// Request to register a bore-server instance with the backend.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterServerRequest {
+    pub id: Option<String>,
+    pub host: String,
+    pub port: u16,
+    pub location: Option<String>,
+    pub max_bandwidth_mbps: Option<u32>,
+    pub max_concurrent_tunnels: Option<u32>,
 }
 
 /// Request to log bandwidth usage.
@@ -150,7 +163,10 @@ impl BackendClient {
         debug!("Validating API key with backend");
 
         let response = self
-            .request(Method::POST, "api/internal/validate-key")
+            .request(
+                Method::POST,
+                &format!("{}/validate-key", INTERNAL_API_PREFIX),
+            )
             .json(&ValidateKeyRequest {
                 api_key: api_key.to_string(),
             })
@@ -190,6 +206,44 @@ impl BackendClient {
         Ok(validation)
     }
 
+    /// Register this bore-server with the backend registry.
+    pub async fn register_server(&self, req: &RegisterServerRequest) -> Result<()> {
+        if !self.enabled {
+            debug!("Backend disabled, skipping server registration");
+            return Ok(());
+        }
+
+        debug!(
+            host = %req.host,
+            port = req.port,
+            id = ?req.id,
+            "Registering bore-server with backend"
+        );
+
+        let response = self
+            .request(
+                Method::POST,
+                &format!("{}/servers/register", INTERNAL_API_PREFIX),
+            )
+            .json(req)
+            .send()
+            .await
+            .context("Failed to connect to backend API for registration")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow!(
+                "Backend registration failed: status={} body={}",
+                status,
+                body
+            ));
+        }
+
+        info!("bore-server registered with backend");
+        Ok(())
+    }
+
     /// Log the start of a tunnel session.
     pub async fn log_tunnel_start(
         &self,
@@ -210,7 +264,10 @@ impl BackendClient {
         );
 
         let response = self
-            .request(Method::POST, "api/internal/tunnel/start")
+            .request(
+                Method::POST,
+                &format!("{}/tunnel/start", INTERNAL_API_PREFIX),
+            )
             .json(&TunnelStartRequest {
                 user_id: user_id.to_string(),
                 public_port,
@@ -237,7 +294,7 @@ impl BackendClient {
             "Logging tunnel end"
         );
 
-        self.request(Method::POST, "api/internal/tunnel/end")
+        self.request(Method::POST, &format!("{}/tunnel/end", INTERNAL_API_PREFIX))
             .json(&TunnelEndRequest {
                 session_id: session_id.to_string(),
                 bytes_transferred,
@@ -329,7 +386,10 @@ impl BackendClient {
             Some(Value::Object(payload))
         };
 
-        let path = format!("api/internal/instances/{instance_id}/tunnel-connected");
+        let path = format!(
+            "{}/instances/{instance_id}/tunnel-connected",
+            INTERNAL_API_PREFIX
+        );
         self.post_with_retry(&path, body.as_ref()).await
     }
 
@@ -338,7 +398,10 @@ impl BackendClient {
             return Ok(());
         }
 
-        let path = format!("api/internal/instances/{instance_id}/tunnel-disconnected");
+        let path = format!(
+            "{}/instances/{instance_id}/tunnel-disconnected",
+            INTERNAL_API_PREFIX
+        );
         self.post_with_retry(&path, None).await
     }
 
@@ -355,15 +418,18 @@ impl BackendClient {
             return Ok(());
         }
 
-        self.request(Method::POST, "api/internal/tunnel/usage")
-            .json(&UsageLogRequest {
-                user_id: user_id.to_string(),
-                session_id: session_id.to_string(),
-                bytes_in,
-                bytes_out,
-            })
-            .send()
-            .await?;
+        self.request(
+            Method::POST,
+            &format!("{}/tunnel/usage", INTERNAL_API_PREFIX),
+        )
+        .json(&UsageLogRequest {
+            user_id: user_id.to_string(),
+            session_id: session_id.to_string(),
+            bytes_in,
+            bytes_out,
+        })
+        .send()
+        .await?;
 
         Ok(())
     }
@@ -454,7 +520,9 @@ mod tests {
 
         let (request_line, headers, body) = handle.await.expect("capture task panicked");
 
-        assert!(request_line.starts_with("POST /api/internal/instances/inst_123/tunnel-connected"));
+        assert!(
+            request_line.starts_with("POST /api/v1/internal/instances/inst_123/tunnel-connected")
+        );
         assert_eq!(
             headers.get("x-internal-api-key"),
             Some(&"internal-secret".to_string())
@@ -482,9 +550,8 @@ mod tests {
 
         let (request_line, headers, _) = handle.await.expect("capture task panicked");
 
-        assert!(
-            request_line.starts_with("POST /api/internal/instances/inst_123/tunnel-disconnected")
-        );
+        assert!(request_line
+            .starts_with("POST /api/v1/internal/instances/inst_123/tunnel-disconnected"));
         assert_eq!(
             headers.get("x-internal-api-key"),
             Some(&"internal-secret".to_string())

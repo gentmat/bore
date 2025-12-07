@@ -109,7 +109,7 @@ impl MockBackend {
         // Route requests
         match (method, path) {
             ("GET", "/health") => self.health_check(),
-            ("POST", path) if path.starts_with("/api/internal/validate-key") => {
+            ("POST", path) if path.starts_with("/api/v1/internal/validate-key") => {
                 self.validate_api_key_internal(body)
             }
             ("POST", path) if path.starts_with("/api/v1/auth/validate") => {

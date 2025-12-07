@@ -7,6 +7,7 @@ import { setHeartbeat, deleteHeartbeat } from "./instance-routes";
 import { schemas, validate } from "../middleware/validation";
 import { ErrorResponses } from "../utils/error-handler";
 import { logger } from "../utils/logger";
+import { registerServer } from "../server-registry";
 
 const router: Router = express.Router();
 
@@ -25,6 +26,29 @@ interface ValidationResponse {
   max_bandwidth_gb?: number;
   instance_id?: string;
 }
+
+// Register bore-server (called by bore-server on startup)
+router.post(
+  "/servers/register",
+  requireInternalApiKey,
+  validate(schemas.registerServer),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Use original casing to preserve camelCase fields like maxBandwidthMbps
+      // Validation middleware stores the pre-normalized payload in bodyOriginal
+      const payload = (req as any).bodyOriginal || req.body;
+      const server = await registerServer(payload);
+      res.json({ success: true, server });
+    } catch (error) {
+      logger.error("Register server error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to register server",
+        req.id,
+      );
+    }
+  },
+);
 
 // Validate tunnel token (called by bore-server)
 router.post(

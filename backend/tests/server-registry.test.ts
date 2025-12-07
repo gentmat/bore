@@ -196,12 +196,15 @@ describe("Server Registry", () => {
       expect(best!.id).toBe("server_2");
     });
 
-    it("should return null when no servers available", async () => {
+    it("should fallback to configured server when none are registered", async () => {
       servers.clear();
 
       const best = await getBestServer();
 
-      expect(best).toBeNull();
+      expect(best).not.toBeNull();
+      expect(best!.host).toBe(config.boreServer.host);
+      expect(best!.port).toBe(config.boreServer.port);
+      expect(servers.get(best!.id)).toBeDefined();
     });
 
     it("should consider both tunnel and bandwidth utilization", async () => {

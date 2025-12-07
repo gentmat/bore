@@ -35,6 +35,14 @@ struct Args {
     #[clap(long, env = "BORE_SERVER_ID", default_value = "default")]
     server_id: String,
 
+    /// Hostname or IP to advertise to the backend for client connections.
+    #[clap(long, env = "BORE_ADVERTISE_HOST")]
+    advertise_host: Option<String>,
+
+    /// Optional location label for this server.
+    #[clap(long, env = "BORE_SERVER_LOCATION")]
+    location: Option<String>,
+
     /// IP address to bind to, clients must reach this.
     #[clap(long, default_value = "0.0.0.0")]
     bind_addr: IpAddr,
@@ -52,12 +60,20 @@ async fn run(args: Args) -> Result<()> {
             .error(ErrorKind::InvalidValue, "port range is empty")
             .exit();
     }
+
+    let advertise_host = args
+        .advertise_host
+        .unwrap_or_else(|| args.bind_tunnels.unwrap_or(args.bind_addr).to_string());
+    let location = args.location.unwrap_or_else(|| "local".to_string());
+
     let mut server = Server::new(
         port_range,
         args.secret.as_deref(),
         args.backend_url,
         args.backend_api_key,
         args.server_id,
+        advertise_host,
+        location,
     );
     server.set_bind_addr(args.bind_addr);
     server.set_bind_tunnels(args.bind_tunnels.unwrap_or(args.bind_addr));

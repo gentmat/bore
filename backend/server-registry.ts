@@ -191,7 +191,35 @@ export async function getActiveServers(): Promise<BoreServer[]> {
  * Get server with most available capacity (lowest utilization)
  */
 export async function getBestServer(): Promise<BoreServer | null> {
-  const active = await getActiveServers();
+  let active = await getActiveServers();
+  
+  // Fallback for single-server setups where nothing is registered yet
+  if (active.length === 0) {
+    const defaultId =
+      process.env.BORE_SERVER_ID ||
+      `server_${config.boreServer.host.replace(/[^a-zA-Z0-9]/g, '_')}_${config.boreServer.port}`;
+
+    const fallback: BoreServer = {
+      id: defaultId,
+      host: config.boreServer.host,
+      port: config.boreServer.port,
+      location: process.env.BORE_SERVER_LOCATION || 'local',
+      maxBandwidthMbps:
+        config.capacity.maxBandwidthPerTunnel * config.capacity.maxTunnelsPerServer,
+      maxConcurrentTunnels: config.capacity.maxTunnelsPerServer,
+      status: 'active',
+      registeredAt: new Date().toISOString(),
+      lastHealthCheck: new Date().toISOString(),
+      currentLoad: 0,
+      currentBandwidthMbps: 0
+    };
+
+    servers.set(defaultId, fallback);
+    logger.info(
+      `Using fallback bore-server from config: ${fallback.host}:${fallback.port} (id=${fallback.id})`
+    );
+    active = [fallback];
+  }
   
   if (active.length === 0) return null;
   
