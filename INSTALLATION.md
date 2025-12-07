@@ -285,6 +285,9 @@ bore signup --api-endpoint http://localhost:3000
 # Or login with an existing account
 bore login --api-endpoint http://localhost:3000
 
+# Create a managed tunnel instance (name + local port)
+bore create-instance my-instance 3000
+
 # List your tunnel instances
 bore list
 

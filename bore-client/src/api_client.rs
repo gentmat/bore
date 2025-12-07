@@ -20,11 +20,17 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+/// User payload returned from login
+#[derive(Debug, Deserialize)]
+pub struct LoginUser {
+    pub id: String,
+}
+
 /// Login response
 #[derive(Debug, Deserialize)]
 pub struct LoginResponse {
     pub token: String,
-    pub user_id: String,
+    pub user: LoginUser,
 }
 
 /// Signup request
@@ -53,9 +59,12 @@ pub struct SignupResponse {
 pub struct Instance {
     pub id: String,
     pub name: String,
+    #[serde(alias = "localPort")]
     pub local_port: u16,
+    #[serde(alias = "region")]
     pub server_region: String,
     pub status: String,
+    #[serde(alias = "publicUrl")]
     pub public_url: Option<String>,
 }
 
@@ -63,6 +72,15 @@ pub struct Instance {
 #[derive(Debug, Deserialize)]
 pub struct InstancesResponse {
     pub instances: Vec<Instance>,
+}
+
+/// Create-instance request
+#[derive(Debug, Serialize)]
+pub struct CreateInstanceRequest {
+    pub name: String,
+    pub local_port: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
 }
 
 /// Connection information for a tunnel
@@ -160,6 +178,62 @@ impl ApiClient {
             status => {
                 let error_text = response.text().await.unwrap_or_default();
                 bail!("signup failed with status {}: {}", status, error_text)
+            }
+        }
+    }
+
+    /// Create a new instance for the authenticated user
+    pub async fn create_instance(
+        &self,
+        name: String,
+        local_port: u16,
+        region: Option<String>,
+    ) -> Result<Instance> {
+        let token = self
+            .auth_token
+            .as_ref()
+            .context("not authenticated. Please run 'bore login' first")?;
+
+        let url = format!("{}/api/v1/instances", self.base_url);
+        let request = CreateInstanceRequest {
+            name,
+            local_port,
+            region,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .bearer_auth(token)
+            .json(&request)
+            .send()
+            .await
+            .context("failed to send create instance request")?;
+
+        match response.status() {
+            StatusCode::CREATED => {
+                let instance: Instance = response
+                    .json()
+                    .await
+                    .context("failed to parse create instance response")?;
+                Ok(instance)
+            }
+            StatusCode::UNAUTHORIZED => {
+                bail!("authentication failed. Please run 'bore login' again")
+            }
+            StatusCode::TOO_MANY_REQUESTS => {
+                bail!("instance creation rate limited. Please try again later")
+            }
+            StatusCode::SERVICE_UNAVAILABLE => {
+                bail!("system at capacity. Please try again later")
+            }
+            status => {
+                let error_text = response.text().await.unwrap_or_default();
+                bail!(
+                    "failed to create instance with status {}: {}",
+                    status,
+                    error_text
+                )
             }
         }
     }

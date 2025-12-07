@@ -38,6 +38,17 @@ enum Command {
     /// Logout from your bore account
     Logout,
 
+    /// Create a new tunnel instance
+    CreateInstance {
+        /// Instance name
+        name: String,
+        /// Local port to forward
+        local_port: u16,
+        /// Optional region (defaults to backend configuration)
+        #[clap(long)]
+        region: Option<String>,
+    },
+
     /// List all your tunnel instances
     List,
 
@@ -57,6 +68,11 @@ async fn run(args: Args) -> Result<()> {
         Command::Signup { api_endpoint } => handle_signup(api_endpoint).await,
         Command::Login { api_endpoint } => handle_login(api_endpoint).await,
         Command::Logout => handle_logout(),
+        Command::CreateInstance {
+            name,
+            local_port,
+            region,
+        } => handle_create_instance(name, local_port, region).await,
         Command::List => handle_list().await,
         Command::Start { instance } => handle_start(instance).await,
         Command::Stop => handle_stop(),
@@ -160,11 +176,49 @@ async fn handle_login(api_endpoint: String) -> Result<()> {
     let login_response = api_client.login(email, password).await?;
 
     // Save credentials
-    let credentials = Credentials::new(api_endpoint, login_response.token, login_response.user_id);
+    let credentials = Credentials::new(
+        api_endpoint,
+        login_response.token,
+        login_response.user.id,
+    );
     credentials.save()?;
 
     println!("✓ Successfully logged in!");
     println!("  User ID: {}", credentials.user_id);
+
+    Ok(())
+}
+
+/// Handle create-instance command
+async fn handle_create_instance(
+    name: String,
+    local_port: u16,
+    region: Option<String>,
+) -> Result<()> {
+    let credentials = Credentials::load()?;
+    let api_client = ApiClient::from_credentials(&credentials);
+
+    println!(
+        "Creating instance \"{}\" on local port {}...",
+        name, local_port
+    );
+
+    let instance = api_client
+        .create_instance(name.clone(), local_port, region)
+        .await?;
+
+    println!("\n Instance created");
+    println!("  Name: {}", instance.name);
+    println!("  ID: {}", instance.id);
+    println!("  Local port: {}", instance.local_port);
+    println!("  Region: {}", instance.server_region);
+    if let Some(url) = instance.public_url.as_ref() {
+        println!("  Public URL: {}", url);
+    } else {
+        println!("  Public URL: (will be assigned when the tunnel is active)");
+    }
+    println!("\nStart the tunnel with:");
+    println!("  bore start {}", instance.name);
 
     Ok(())
 }

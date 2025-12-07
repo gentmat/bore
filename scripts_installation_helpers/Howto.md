@@ -29,6 +29,29 @@ sudo docker compose up -d
 sudo docker compose ps
 ```
 
+
+To remove the backend server, run:
+```bash
+# Stop all containers
+sudo docker stop $(sudo docker ps -aq)
+
+# Remove all containers
+sudo docker rm $(sudo docker ps -aq)
+
+# Remove all images
+sudo docker rmi $(sudo docker images -q)
+
+# Remove all volumes
+sudo docker volume rm $(sudo docker volume ls -q)
+
+// check
+sudo docker compose ps
+sudo docker volume ls
+
+```
+
+
+
 **Expected URLs:**
 - Backend API: http://localhost:3000
 - Login Page: http://localhost:3000/login.html
@@ -121,13 +144,19 @@ bore login --api-endpoint http://localhost:3000
 ```
 If you set `BORE_API_ENDPOINT`, you can omit `--api-endpoint`.
 
-3. **List available tunnel instances**
+3. **Create a managed tunnel instance**
+```bash
+bore create-instance <name> <local-port>
+```
+This registers an instance in your account. Make sure your app is listening on
+`<local-port>` on this machine.
+
+4. **List your tunnel instances**
 ```bash
 bore list
 ```
-This shows all instances associated with your account (created via the dashboard).
 
-4. **Start a tunnel for an instance**
+5. **Start a tunnel for an instance**
 ```bash
 bore start <instance-name-or-id>
 ```
@@ -138,7 +167,7 @@ The client will:
 
 Keep this process running. Use `Ctrl+C` to stop the tunnel.
 
-5. **Logout (optional)**
+6. **Logout (optional)**
 ```bash
 bore logout
 ```
@@ -148,3 +177,27 @@ bore logout
 The CLI respects this environment variable:
 
 - `BORE_API_ENDPOINT`: Default API endpoint for `bore signup` and `bore login`
+
+
+
+
+
+
+client
+
+sudo rm /usr/local/bin/bore
+cd /home/gentmat/CascadeProjects/bore
+cargo install --path bore-client --force
+export PATH="$HOME/.cargo/bin:$PATH"
+source ~/.bashrc   # or ~/.zshrc
+which bore
+
+bore signup --api-endpoint http://localhost:3000
+bore login --api-endpoint http://localhost:3000
+# Example: app listens on localhost:3000
+bore create-instance maroun_instance 3000
+bore create-instance name port
+bore logout
+bore list
+bore start <instance-name-or-id>
+bore stop
