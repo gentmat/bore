@@ -61,7 +61,6 @@ Data Layer (PostgreSQL + Redis)
 - `bore-client/` - Pure CLI client
 - `bore-server/` - Lightweight tunnel server
 - `backend/` - Central coordinator
-- `bore-gui/` - Desktop application
 - `bore-shared/` - Shared protocol definitions
 
 ### 2. **Type Safety** (9.0/10)

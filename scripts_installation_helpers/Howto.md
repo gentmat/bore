@@ -75,22 +75,6 @@ bore local 8080 --to localhost --port 7835
 bore local 8080 --to your-server.com --port 7835
 ```
 
-### 4. Start GUI (Optional)
-
-The desktop GUI provides a visual interface for managing tunnels.
-
-```bash
-# Build the GUI
-./10_build_gui.sh
-
-# Run the GUI
-bore-gui
-```
-
-**Expected output:**
-- Desktop application window opens
-- Visual tunnel management interface
-
 ## Service Management Commands
 
 ### Check Status

@@ -30,7 +30,6 @@ Complete guide for developers contributing to the Bore project. Covers setup, ar
 
 **Optional:**
 - **Docker** and Docker Compose (for containerized development)
-- **code-server** (for bore-gui development)
 
 ### System Dependencies (Linux)
 
@@ -141,19 +140,6 @@ bore --version
 bore-server --version
 ```
 
-**6. Setup bore-gui (Optional):**
-```bash
-cd bore-gui
-
-# Install dependencies
-npm install
-
-# Start development mode
-npm run tauri dev
-```
-
----
-
 ## Project Structure
 
 ```
@@ -191,17 +177,6 @@ bore/
 │   │   └── auth.rs           # Auth utilities
 │   └── Cargo.toml
 │
-├── bore-gui/                  # Tauri desktop application
-│   ├── src/                  # React frontend
-│   │   ├── components/       # React components
-│   │   ├── App.tsx          # Main app
-│   │   └── main.tsx
-│   ├── src-tauri/           # Rust backend
-│   │   ├── src/
-│   │   │   ├── main.rs      # Tauri setup
-│   │   │   └── commands.rs  # Backend commands
-│   │   └── Cargo.toml
-│   └── package.json
 │
 ├── tests/                    # Integration tests
 │   ├── e2e_test.rs
@@ -222,11 +197,11 @@ bore/
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Client Layer                          │
-│  ┌──────────────┐        ┌──────────────┐              │
-│  │  bore-client │        │   bore-gui   │              │
-│  │    (CLI)     │        │  (Desktop)   │              │
-│  └──────┬───────┘        └──────┬───────┘              │
-└─────────┼────────────────────────┼──────────────────────┘
+│  ┌──────────────┐                                        │
+│  │  bore-client │                                        │
+│  │    (CLI)     │                                        │
+│  └──────┬───────┘                                        │
+└─────────┼────────────────────────────────────────────────┘
           │                        │
           │ TCP Tunnel             │ REST API
           │                        │
@@ -268,12 +243,6 @@ bore/
 - Instance lifecycle management
 - Multi-server orchestration
 - Capacity management and load balancing
-
-**4. bore-gui (Tauri + React)**
-- Cross-platform desktop application
-- User-friendly interface for tunnel management
-- Manages bore-client processes
-- Real-time status updates
 
 ---
 
@@ -410,18 +379,6 @@ mod tests {
         assert!(result.is_ok());
     }
 }
-```
-
-### GUI Tests
-
-```bash
-cd bore-gui
-
-# Run frontend tests
-npm test
-
-# Run Tauri tests
-cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 ---

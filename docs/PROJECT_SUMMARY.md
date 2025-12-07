@@ -39,7 +39,6 @@ Bore is a high-performance TCP tunnel solution that enables secure, scalable por
 ### Components
 - **bore-client**: Command-line client for creating tunnels
 - **bore-server**: High-performance TCP server written in Rust
-- **bore-gui**: Cross-platform desktop application (Tauri + React)
 - **bore-shared**: Shared libraries and protocols
 - **backend**: Node.js/Express API server for authentication and management
 

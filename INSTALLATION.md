@@ -289,26 +289,6 @@ bore local 8080 --to your-server.com --port 7835
 
 ---
 
-## Bore GUI (Desktop Client)
-
-### Prerequisites
-
-```bash
-sudo pacman -S webkit2gtk base-devel curl wget openssl appmenu-gtk-module gtk3 libappindicator-gtk3 librsvg libvips
-```
-
-### Build
-
-```bash
-cd bore-gui
-npm install
-npm run tauri build
-```
-
-Binary at: `bore-gui/src-tauri/target/release/bore-gui`
-
----
-
 ## Kubernetes Deployment
 
 See `k8s/` directory for manifests.

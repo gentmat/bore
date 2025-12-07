@@ -64,8 +64,6 @@ chmod +x *.sh
 | `7_view_logs.sh` | View container logs |
 | `8_configure_firewall.sh` | Open required ports |
 | `9_build_client.sh` | Build and install bore CLI client |
-| `10_build_gui.sh` | Build bore GUI desktop app |
-| `11_uninstall_code_server.sh` | Remove code-server installed by GUI |
 
 ## Full Install (one-liner)
 

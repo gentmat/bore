@@ -351,23 +351,6 @@ setInterval(async () => {
 **Exceptional aspects**:
 - ✅ **Performance optimization**: Only checks active instances, not entire database
 - ✅ **Horizontal scaling**: Uses Redis for distributed state
-- ✅ **Real-time alerts**: Broadcasts status changes immediately
-- ✅ **Error resilience**: Continues monitoring even if one check fails
-
----
-
-## 🖥️ 3. Tauri GUI: Defensive Dependency Management
-
-**File**: `bore-gui/src/App.tsx:22-184`
-
-### Why This Is Exemplary
-
-This implementation demonstrates **production-ready desktop UI** with careful dependency validation:
-
-#### 3.1 Comprehensive Dependency Validation
-
-```typescript
-// Lines 31-68: Multi-stage initialization with error recovery
 const initializeApp = useCallback(async () => {
   setLoading(true);
   setDependencyError(null);

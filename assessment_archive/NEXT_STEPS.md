@@ -158,32 +158,6 @@ Visualize metrics and system health.
 
 ---
 
-### 6. **Add Playwright E2E Tests** (2-3 hours)
-Comprehensive GUI testing.
-
-**Install**:
-```bash
-cd bore-gui
-npm install -D @playwright/test
-```
-
-**Create**: `bore-gui/e2e/main.spec.ts`
-```typescript
-import { test, expect } from '@playwright/test';
-
-test('create tunnel', async ({ page }) => {
-  await page.goto('http://localhost:3000/dashboard');
-  await page.fill('input[name="port"]', '8080');
-  await page.click('button:has-text("Create")');
-  await expect(page.locator('text=Tunnel created')).toBeVisible();
-});
-```
-
-**Benefit**:
-- Catch UI regressions
-- Automated testing
-- Cross-browser support
-
 ---
 
 ## 🔒 Security Enhancements (Next 2 Weeks)
@@ -501,7 +475,6 @@ Medium Impact, Low Effort:
 ### Week 2-3: Monitoring & Security
 - [ ] Implement OpenTelemetry
 - [ ] Create Grafana dashboard
-- [ ] Add Playwright tests
 - [ ] Implement SAST
 
 ### Week 4-6: Scalability
@@ -588,9 +561,6 @@ cd backend && npm install @opentelemetry/api
 
 # 2. Create Grafana dashboard
 # Use monitoring/grafana-dashboard.json
-
-# 3. Add Playwright tests
-cd bore-gui && npm install -D @playwright/test
 ```
 
 ---

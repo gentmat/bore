@@ -36,7 +36,6 @@
 
 **Optional:**
 - **Docker** and Docker Compose
-- **code-server** (for GUI development)
 
 ### System Dependencies (Linux)
 
@@ -127,7 +126,6 @@ bore/
 │   └── package.json
 ├── bore-client/            # CLI client (Rust)
 ├── bore-server/            # TCP server (Rust)
-├── bore-gui/               # Desktop app (Tauri + React)
 ├── bore-shared/            # Shared libraries
 │   └── src/
 │       ├── protocol/       # Communication protocol
