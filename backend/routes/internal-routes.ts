@@ -72,7 +72,7 @@ router.post(
       }
 
       // Check if token expired
-      if (new Date(tokenInfo.expires_at as string | Date) < new Date()) {
+      if (new Date(tokenInfo.expiresAt as string | Date) < new Date()) {
         await db.deleteTunnelToken(api_key);
         res.json({
           valid: false,
@@ -83,7 +83,7 @@ router.post(
       }
 
       const instance = await db.getInstanceById(
-        tokenInfo.instance_id as string,
+        tokenInfo.instanceId as string,
       );
 
       if (!instance) {
@@ -96,15 +96,15 @@ router.post(
         return;
       }
 
-      const user = await db.getUserById(tokenInfo.user_id as string);
+      const user = await db.getUserById(tokenInfo.userId as string);
       const planType = (user?.plan || "trial") as keyof typeof config.plans;
 
       // Check if plan has expired
-      if (user?.plan_expires) {
+      if (user?.planExpires) {
         const planExpiry =
-          user.plan_expires instanceof Date
-            ? user.plan_expires
-            : new Date(user.plan_expires as string);
+          user.planExpires instanceof Date
+            ? user.planExpires
+            : new Date(user.planExpires as string);
         if (planExpiry < new Date()) {
           await db.deleteTunnelToken(api_key);
           res.json({
@@ -124,7 +124,7 @@ router.post(
       res.json({
         valid: true,
         usage_allowed: true,
-        user_id: tokenInfo.user_id,
+        user_id: tokenInfo.userId,
         plan_type: planType,
         max_concurrent_tunnels: maxConcurrent,
         max_bandwidth_gb: maxBandwidth,

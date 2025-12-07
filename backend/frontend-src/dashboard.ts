@@ -1,10 +1,11 @@
 interface Instance {
     id: string;
     name: string;
-    local_port: number;
-    server_region: string;
+    // Backend responses use camelCase (see database.ts/instance-routes.ts)
+    localPort: number;
+    region: string;
     status: string;
-    public_url?: string;
+    publicUrl?: string | null;
 }
 
 const API_BASE = window.location.origin;
@@ -122,7 +123,7 @@ function updateInstanceCard(card: HTMLElement, instance: Instance): void {
 
     const regionEl = card.querySelector('[data-field="region"]') as HTMLElement;
     if (regionEl) {
-        regionEl.textContent = instance.server_region;
+        regionEl.textContent = instance.region;
     }
 
     const statusEl = card.querySelector('[data-field="status"]') as HTMLElement;
@@ -133,14 +134,15 @@ function updateInstanceCard(card: HTMLElement, instance: Instance): void {
 
     const localPortEl = card.querySelector('[data-field="local_port"]') as HTMLElement;
     if (localPortEl) {
-        localPortEl.textContent = instance.local_port.toString();
+        const port = instance.localPort;
+        localPortEl.textContent = (port !== undefined && port !== null) ? port.toString() : '';
     }
 
     const publicUrlRow = card.querySelector('[data-field="public_url_row"]') as HTMLElement;
     const publicUrlEl = card.querySelector('[data-field="public_url"]') as HTMLElement;
     if (publicUrlRow && publicUrlEl) {
-        if (instance.status === 'active' && instance.public_url) {
-            publicUrlEl.textContent = instance.public_url;
+        if (instance.status === 'active' && instance.publicUrl) {
+            publicUrlEl.textContent = instance.publicUrl;
             publicUrlRow.style.display = '';
         } else {
             publicUrlEl.textContent = '';
@@ -156,7 +158,7 @@ function updateInstanceCard(card: HTMLElement, instance: Instance): void {
 }
 
 function buildInstanceCardInnerHTML(instance: Instance): string {
-    const publicUrlVisible = instance.status === 'active' && instance.public_url;
+    const publicUrlVisible = instance.status === 'active' && instance.publicUrl;
 
     return `
         <div class="instance-header">
@@ -168,7 +170,7 @@ function buildInstanceCardInnerHTML(instance: Instance): string {
                         <line x1="2" y1="12" x2="22" y2="12"/>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
-                    <span class="instance-region-text" data-field="region">${instance.server_region}</span>
+                    <span class="instance-region-text" data-field="region">${instance.region}</span>
                 </div>
             </div>
             <span class="status-badge status-${instance.status}" data-field="status">
@@ -178,11 +180,11 @@ function buildInstanceCardInnerHTML(instance: Instance): string {
         <div class="instance-details">
             <div class="detail-row">
                 <span class="detail-label">Local Port</span>
-                <span class="detail-value" data-field="local_port">${instance.local_port}</span>
+                <span class="detail-value" data-field="local_port">${instance.localPort}</span>
             </div>
             <div class="detail-row" data-field="public_url_row" style="${publicUrlVisible ? '' : 'display: none;'}">
                 <span class="detail-label">Public URL</span>
-                <span class="detail-value public-url" data-field="public_url">${publicUrlVisible ? instance.public_url : ''}</span>
+                <span class="detail-value public-url" data-field="public_url">${publicUrlVisible ? instance.publicUrl : ''}</span>
             </div>
         </div>
         <div class="instance-actions">
@@ -194,7 +196,7 @@ function buildInstanceCardInnerHTML(instance: Instance): string {
 function bindCardActions(card: HTMLElement, instance: Instance): void {
     const viewButton = card.querySelector('[data-action="view"]') as HTMLButtonElement;
     if (viewButton) {
-        viewButton.addEventListener('click', () => viewTunnel(instance.id, instance.name, instance.local_port));
+        viewButton.addEventListener('click', () => viewTunnel(instance.id, instance.name, instance.localPort));
     }
 
     const disconnectButton = card.querySelector('[data-action="disconnect"]') as HTMLButtonElement;

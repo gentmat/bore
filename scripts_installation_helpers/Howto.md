@@ -48,6 +48,12 @@ sudo docker volume rm $(sudo docker volume ls -q)
 sudo docker compose ps
 sudo docker volume ls
 
+
+cd backend
+
+# Rebuild backend image with the new route + relaxed validation
+docker compose build backend
+
 ```
 
 
@@ -184,7 +190,7 @@ The CLI respects this environment variable:
 
 
 client
-
+cargo build --release -p bore-client
 sudo rm /usr/local/bin/bore
 cd /home/gentmat/CascadeProjects/bore
 cargo install --path bore-client --force

@@ -425,6 +425,74 @@ router.post(
   },
 );
 
+// Update instance connection metadata (status, remote port, public URL)
+router.patch(
+  "/:id/connection",
+  authenticateJWT,
+  validate(schemas.connectionUpdate),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const authReq = req as AuthRequest;
+      const instanceId = req.params.id as string;
+      const instance = await db.getInstanceById(instanceId);
+
+      if (!instance || instance.userId !== authReq.user.user_id) {
+        ErrorResponses.notFound(res, "Instance", authReq.id);
+        return;
+      }
+
+      // req.body is normalized to snake_case by validation middleware
+      const { status, remote_port, public_url } = req.body || {};
+
+      const updates: Record<string, unknown> = {};
+
+      if (status) {
+        updates.status = status;
+      }
+
+      if (remote_port !== undefined && remote_port !== null) {
+        const effectiveHost =
+          // Instance records may expose either snake_case or camelCase host fields
+          (instance as any).server_host ||
+          (instance as any).serverHost ||
+          BORE_SERVER_HOST;
+        updates.remote_port = remote_port;
+        if (!public_url) {
+          updates.public_url = `${effectiveHost}:${remote_port}`;
+        }
+      }
+
+      if (public_url !== undefined) {
+        updates.public_url = public_url;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        res.json({ success: true, instance });
+        return;
+      }
+
+      const updated = await db.updateInstance(instance.id, updates);
+
+      // Signal SSE/WebSocket broadcast when status changes
+      if (updates.status) {
+        res.locals.broadcast = true;
+        res.locals.userId = instance.userId || (instance as any).user_id;
+        res.locals.instanceId = instance.id;
+        res.locals.status = updates.status;
+      }
+
+      res.json({ success: true, instance: updated });
+    } catch (error) {
+      logger.error("Update connection error", error as Error);
+      ErrorResponses.internalError(
+        res,
+        "Failed to update instance connection",
+        (req as AuthRequest).id,
+      );
+    }
+  },
+);
+
 // Disconnect instance
 router.post(
   "/:id/disconnect",

@@ -93,8 +93,8 @@ const schemas = {
     status: Joi.string()
       .valid("active", "inactive", "starting", "offline", "degraded", "idle")
       .optional(),
-    publicUrl: Joi.string().uri().optional().allow(null),
-    public_url: Joi.string().uri().optional().allow(null),
+    publicUrl: Joi.string().max(2048).optional().allow(null),
+    public_url: Joi.string().max(2048).optional().allow(null),
     remotePort: Joi.number().integer().min(1).max(65535).optional().allow(null),
     remote_port: Joi.number()
       .integer()
