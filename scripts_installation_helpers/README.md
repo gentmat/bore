@@ -50,10 +50,12 @@ chmod +x *.sh
 ```bash
 ./11_uninstall_code_server.sh
 ```
+./12_clean_docker.sh
 
 ## Scripts
 
 | Script | Description |
+
 |--------|-------------|
 | `1_install_dependencies.sh` | Install Docker, docker-compose, git |
 | `2_setup_environment.sh` | Configure .env with secure secrets |

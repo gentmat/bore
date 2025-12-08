@@ -190,14 +190,13 @@ The CLI respects this environment variable:
 
 
 client
+cd /home/gentmat/CascadeProjects/bore
 cargo build --release -p bore-client
 sudo rm /usr/local/bin/bore
-cd /home/gentmat/CascadeProjects/bore
 cargo install --path bore-client --force
 export PATH="$HOME/.cargo/bin:$PATH"
 source ~/.bashrc   # or ~/.zshrc
 which bore
-
 bore signup --api-endpoint http://localhost:3000
 bore login --api-endpoint http://localhost:3000
 # Example: app listens on localhost:3000

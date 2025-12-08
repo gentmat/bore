@@ -52,6 +52,7 @@ pub fn start_for_current_dir(port: u16) {
     let bind_addr = format!("0.0.0.0:{}", port);
 
     let mut cmd = Command::new("code-server");
+    cmd.env_remove("VSCODE_IPC_HOOK_CLI");
     cmd.arg(cwd)
         .arg("--bind-addr")
         .arg(&bind_addr)
