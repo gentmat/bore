@@ -35,7 +35,7 @@ pub fn warn_if_missing() {
     eprintln!("  https://coder.com/docs/code-server/install");
 }
 
-pub fn start_for_current_dir(port: u16) {
+pub fn start_for_current_dir(port: u16, password: Option<&str>) {
     if !is_installed() {
         warn_if_missing();
         return;
@@ -53,6 +53,9 @@ pub fn start_for_current_dir(port: u16) {
 
     let mut cmd = Command::new("code-server");
     cmd.env_remove("VSCODE_IPC_HOOK_CLI");
+    if let Some(pw) = password {
+        cmd.env("PASSWORD", pw);
+    }
     cmd.arg(cwd)
         .arg("--bind-addr")
         .arg(&bind_addr)

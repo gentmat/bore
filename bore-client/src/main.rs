@@ -167,19 +167,21 @@ async fn handle_login(api_endpoint: String) -> Result<()> {
     let email = email.trim().to_string();
 
     // Prompt for password (using rpassword for hidden input)
-    let password = rpassword::prompt_password("Password: ").context("failed to read password")?;
+    let password = rpassword::prompt_password("Password: ")
+        .context("failed to read password")?;
 
     println!("\nAuthenticating...");
 
     // Login via API
     let mut api_client = ApiClient::new(api_endpoint.clone());
-    let login_response = api_client.login(email, password).await?;
+    let login_response = api_client.login(email, password.clone()).await?;
 
-    // Save credentials
+    // Save credentials (reuse account password for code-server)
     let credentials = Credentials::new(
         api_endpoint,
         login_response.token,
         login_response.user.id,
+        Some(password),
     );
     credentials.save()?;
 
@@ -259,13 +261,14 @@ async fn handle_signup(api_endpoint: String) -> Result<()> {
 
     // Signup via API
     let mut api_client = ApiClient::new(api_endpoint.clone());
-    let signup_response = api_client.signup(name, email, password).await?;
+    let signup_response = api_client.signup(name, email, password.clone()).await?;
 
-    // Save credentials
+    // Save credentials (reuse account password for code-server)
     let credentials = Credentials::new(
         api_endpoint,
         signup_response.token,
         signup_response.user.id,
+        Some(password),
     );
     credentials.save()?;
 
@@ -345,7 +348,10 @@ async fn handle_start(instance_name_or_id: String) -> Result<()> {
     println!("✓ Forwarding localhost:{}\n", connection_info.local_port);
     println!("  Instance ID: {}", connection_info.instance_id);
     println!("  Token TTL: {}s\n", connection_info.ttl);
-    code_server::start_for_current_dir(connection_info.local_port);
+    code_server::start_for_current_dir(
+        connection_info.local_port,
+        credentials.code_server_password.as_deref(),
+    );
 
     // Start heartbeat task to report online status
     let instance_id = instance.id.clone();

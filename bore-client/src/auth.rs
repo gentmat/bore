@@ -14,15 +14,24 @@ pub struct Credentials {
     pub auth_token: String,
     /// User ID
     pub user_id: String,
+    /// Optional code-server password to reuse for local IDE sessions
+    #[serde(default)]
+    pub code_server_password: Option<String>,
 }
 
 impl Credentials {
     /// Create new credentials
-    pub fn new(api_endpoint: String, auth_token: String, user_id: String) -> Self {
+    pub fn new(
+        api_endpoint: String,
+        auth_token: String,
+        user_id: String,
+        code_server_password: Option<String>,
+    ) -> Self {
         Self {
             api_endpoint,
             auth_token,
             user_id,
+            code_server_password,
         }
     }
 
